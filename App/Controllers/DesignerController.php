@@ -225,9 +225,11 @@ class DesignerController{
                 return;
             }
 
+            // 성공 200 코드
             json_response([
-                'success' => true 
-            ], 201);
+                'success' => true,
+                'message' => '작성 성공 했습니다.' 
+            ]);
     
         // 예외 처리 (서버내 오류 발생지)
         } catch (RuntimeException $e) {
@@ -339,9 +341,11 @@ class DesignerController{
             $stmt->bind_param($types, ...$params);
             $stmt->execute();
 
+            // 성공 200 코드
             json_response([
-                'success' => true
-            ]);
+                'success' => true,
+                'message' => 'update성공 했습니다.'
+            ],200);
         
         // 예외 처리 (서버내 오류 발생지)
         } catch (Throwable $e) {
@@ -441,9 +445,11 @@ class DesignerController{
             $stmt->bind_param('ssi', $newUrl, $newKey, $designer_id);
             $stmt->execute();
 
+            // 성공 200 코드
             json_response([
-                'success' => true
-            ], 201);
+                'success' => true,
+                'message' => 'update성공 했습니다.'
+            ]);
 
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
