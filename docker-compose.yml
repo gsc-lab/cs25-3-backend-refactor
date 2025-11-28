@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  web:
+    image: nginx:alpine
+    container_name: web-1
+    ports:
+      - "80:80"
+    environment:
+      TZ: ${TIME_ZONE:-Asia/Seoul}
+    volumes:
+      - ./:/var/www/html:rw
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    ports:
+      - "8080:80"
+    container_name: app-1
+    environment:
+      TZ: ${TIME_ZONE:-Asia/Seoul}
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html:rw
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: db-1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      
+      TZ: ${TIME_ZONE:-Asia/Seoul}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:

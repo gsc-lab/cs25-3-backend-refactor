@@ -1,0 +1,27 @@
+# macOS, Windows 시스템 파일
+.DS_Store
+Thumbs.db
+
+# Docker MySQL 데이터 볼륨 (Docker가 자동 생성하는 DB 파일)
+docker/mysql/init.sql~
+
+# 로그 파일
+*.log
+
+# IDE 설정 (PHPStorm, VSCode 등)
+.idea/
+*.iml
+.vscode/
+
+# 백업 파일
+*~
+*.bak
+
+# .env 환경 설정 파일
+.env
+
+# vendor 폴더
+/vendor/
+
+# composer.lock
+composer.lock
