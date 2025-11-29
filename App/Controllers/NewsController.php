@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Errors\ErrorHandler;
 use App\Services\ImageService;
 use RuntimeException;
 use Throwable;
@@ -93,16 +94,8 @@ class NewsController {
                 ]
             ], 400);
             return;
-        } catch (Throwable $e){
-            error_log('[news_create]'. $e->getMessage());
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ]
-            ], 500);
-            return;
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }
     }
 
@@ -144,15 +137,7 @@ class NewsController {
             ]);
 
         } catch (Throwable $e) {
-            error_log('[news_index]'. $e->getMessage());
-            json_response([
-                "success" => false,
-                "error"   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.'
-                ]
-            ], 500);
-            return;
+            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }
     }
 
@@ -209,14 +194,7 @@ class NewsController {
             ]);
 
         } catch (Throwable $e) {
-            error_log('[news_show]'. $e->getMessage());
-            json_response([
-                "success" => false,
-                "error"   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR', 
-                    'message' => '서버 오류가 발생했습니다.'
-            ]],500);
-            return;
+            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }
     }
 
@@ -316,13 +294,7 @@ class NewsController {
             ], 201);
         
         } catch (Throwable $e) {
-            error_log('[news_update]'.$e->getMessage());
-            json_response([
-                "success" => false,
-                "error" => ["code" => "INTERNAL_SERVER_ERROR",
-                            "message" => "서버 오류가 발생했습니다." ]
-            ], 500);
-            return;
+            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }
     }
 
@@ -428,14 +400,7 @@ class NewsController {
             ]);
 
         } catch (Throwable $e) {
-            error_log('[news_updateImage] ' . $e->getMessage());
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }         
     }
 
@@ -515,14 +480,9 @@ class NewsController {
                 ],204);
 
             $stmt2->close();
+            
         } catch (Throwable $e) {
-            error_log('[news_delet]'. $e);
-            json_response([
-                "success" => false,
-                "error" => ['code' => 'INTERNAL_SERVER_ERROR', 
-                            'message' => '서버 오류가 발생했습니다.'
-            ]],500);
-            return;
+            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }
     }  
 
