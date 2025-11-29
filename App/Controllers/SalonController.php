@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Errors\ErrorHandler;
 use App\Services\ImageService;
 use RuntimeException;
 use Throwable;
@@ -31,15 +32,7 @@ class SalonController
                 'data'    => ['salon' => $row],
             ]);
         } catch (Throwable $e) {
-            error_log('[salon_index] ' . $e->getMessage());
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
-            return;
+            json_response(ErrorHandler::server($e, '[salon_index]'), 500);
         }
     }
 
@@ -221,15 +214,7 @@ class SalonController
             ], 400);
             return;
         } catch (Throwable $e) {
-            error_log('[salon_update] ' . $e->getMessage());
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
-            return;
+            json_response(ErrorHandler::server($e, '[salon_update]'),500);
         }
     }
 }
