@@ -1,14 +1,16 @@
 <?php
 
 namespace App\Controllers;
+
+use App\Errors\ErrorHandler;
 use Throwable;
+
 // DB 로딩
 require_once __DIR__."/../db.php";
 // http.php 불러오기
 require_once __DIR__."/../http.php";
 
-class UsersController
-{
+class UsersController {
 
 
     // ======================
@@ -45,14 +47,8 @@ class UsersController
         
             // 오류시 
         } catch (Throwable $e) {
-            error_log('[users_show]'. $e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 오류가 발생했습니다.']
-                ], 500);
-                return;
-            }     
+            json_response(ErrorHandler::server($e,'[users_show]'), 500);
+        }     
     }
 
     // ====================
@@ -117,12 +113,7 @@ class UsersController
             
 
         } catch (Throwable $e) {
-            error_log('[users_create]' .$e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 내부 오류가 발생했습니다.']
-            ], 500);
+            json_response(ErrorHandler::server($e,'[users_create]'), 500);
         }
     } 
 
@@ -186,12 +177,7 @@ class UsersController
 
         
         } catch (Throwable $e) {
-            error_log('[users_update' . $e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 내부 오류가 발생했습니다.'
-            ]], 500);
+            json_response(ErrorHandler::server($e,'[users_update]'), 500);
         }
     }
 
@@ -213,12 +199,7 @@ class UsersController
             http_response_code(204);
             return;
         } catch (Throwable $e) {
-            error_log('[users_delete]' . $e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 내부 오류가 발생했습니다.'
-            ]], 500);
+            json_response(ErrorHandler::server($e,'[users_delete]'), 500);
         }      
     } 
 
