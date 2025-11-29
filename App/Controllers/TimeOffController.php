@@ -1,12 +1,12 @@
 <?php
 
+namespace App\Controllers;
 
- namespace App\Controllers;
+use App\Errors\ErrorHandler;
+use Throwable;
 
-    use Throwable;
-
-    require_once __DIR__ . "/../db.php";
-    require_once __DIR__ . "/../http.php";
+require_once __DIR__ . "/../db.php";
+require_once __DIR__ . "/../http.php";
 
 class TimeoffController {
 
@@ -46,15 +46,7 @@ class TimeoffController {
         
         // 예외 처리 (서버내 오류 발생지) 
         } catch (Throwable $e) {
-            // 에러 내용을 서버 로그에 기록
-            error_log('[timeoff_index]'.$e->getMessage());
-            // 500 서버 오류 전달
-            json_response([
-                "success" => false,
-                "error" => ['code' => 'INTERNAL_SERVER_ERROR', 
-                            'message' => '서버 내부 오류가 발생했습니다.'
-                ]],500);
-            return;
+            json_response(ErrorHandler::server($e, '[timeoff_index]'), 500);
         }
     }
 
@@ -93,18 +85,13 @@ class TimeoffController {
 
             // 성공 응답
             json_response([
-                'success' => true
-            ]);
+                'success' => true,
+                'message' => '작성 성공했습니다.'
+            ],201);
 
         // 예외 처리 (서버내 오류 발생지) 
         } catch (Throwable $e) {
-                error_log('[timeoff_create]'.$e->getMessage());
-                json_response([
-                "success" => false,
-                "error" => ['code' => 'INTERNAL_SERVER_ERROR', 
-                            'message' => '서버 내부 오류가 발생했습니다.'
-            ]],500);
-            return;
+            json_response(ErrorHandler::server($e, '[timeoff_create]'), 500);
         }
     }
 
@@ -176,20 +163,15 @@ class TimeoffController {
             
             // 성공 응답
             json_response([
-                'success' => true
+                'success' => true,
+                'message' => '수정 성공했습니다.'
             ]);
         
         // 예외 처리 (서버내 오류 발생지)
         } catch (Throwable $e) {
-                error_log('[timeoff_update]'.$e->getMessage());
-                json_response([
-                    "success" => false,
-                    "error" => ['code' => 'INTERNAL_SERVER_ERROR', 
-                                'message' => '서버 내부 오류가 발생했습니다.'
-                ]],500);
-                return;
+            json_response(ErrorHandler::server($e, '[timeoff_update]'), 500);
         }
-}
+    }
 
 
     // ==============================
@@ -236,19 +218,10 @@ class TimeoffController {
 
         // 예외 처리 (서버내 오류 발생지)
         } catch (Throwable $e) {
-                error_log('[hairstyle]'.$e->getMessage());
-                json_response([
-                    "success" => false,
-                    "error" => ['code' => 'INTERNAL_SERVER_ERROR', 
-                                'message' => '서버 내부 오류가 발생했습니다.'
-            ]],500);
-            return;
+            json_response(ErrorHandler::server($e, '[timeoff_delete]'), 500);
         }      
     }
 }
 
 
 
-
-
-?>
