@@ -94,9 +94,10 @@ class NewsController {
                 ]
             ], 400);
             return;
-        } catch (Throwable $e) {
-            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
+         } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[news_create]'),500);
         }
+
     }
 
     // ==========================
@@ -136,9 +137,10 @@ class NewsController {
                 "data"    => ['news' => $news],
             ]);
 
-        } catch (Throwable $e) {
-            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
+         } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[news_index]'),500);
         }
+
     }
 
 
@@ -193,9 +195,10 @@ class NewsController {
                 "data"    => ['news' => $row]
             ]);
 
-        } catch (Throwable $e) {
-            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
+         } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[news_show]'),500);
         }
+
     }
 
 
@@ -293,9 +296,10 @@ class NewsController {
                 "data"    => ['news' => $row]
             ], 201);
         
-        } catch (Throwable $e) {
-            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
+         } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[news_update]'),500);
         }
+
     }
 
 
@@ -399,9 +403,10 @@ class NewsController {
                 'success' => true
             ]);
 
-        } catch (Throwable $e) {
-            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
-        }         
+         } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[news_updateImage]'),500);
+        }
+         
     }
 
 
@@ -480,10 +485,10 @@ class NewsController {
                 ],204);
 
             $stmt2->close();
-            
-        } catch (Throwable $e) {
-            json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
+         } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[news_delete]'),500);
         }
+
     }  
 
 }
