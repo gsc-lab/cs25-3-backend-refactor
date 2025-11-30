@@ -2,6 +2,7 @@
     
 namespace App\Controllers;
 
+use App\Repository\ServiceRepository;
 use App\Errors\ErrorHandler;
 use Throwable;
 
@@ -19,23 +20,9 @@ class ServiceController{
             // DB접속
             $db = get_db();
 
-            // Service테이블의 전체 내용 가져오기
-            // sql문
-            $stmt = $db->prepare("SELECT 
-                                        service_id, service_name, price, duration_min 
-                                        FROM Service");
-            // 실행
-            $stmt->execute();
-            // 결과 받기
-            $result = $stmt->get_result();
-            
-            // 모둔 Service 정보를 넣는 리스터
-            $services = [];
-            
-            // 반복문을 사용해서 모든 레코드를 리스트에 넣기
-            while($row = $result->fetch_assoc()){
-                array_push($services, $row);
-            }
+            // ServiceRepositry의 인스탄스를 생성
+            $repo = new ServiceRepository($db); // DB를 인자 값으로 보내기
+            $services = $repo->index();
             
             // 프런트엔드에 리스터를 반환
             json_response([
@@ -76,21 +63,13 @@ class ServiceController{
             // DB연결
             $db = get_db();
         
-            // sql문
-            $stmt = $db->prepare("INSERT INTO Service 
-                                    (service_name, price, duration_min) 
-                                VALUES(?,?,?)");
-            // binding
-            $stmt->bind_param('ssi', $service_name, $price, $duration_min);
-            // 실행
-            $stmt->execute();
+            $repo = new ServiceRepository($db);
+            $repo->create($service_name, $price, $duration_min);
 
             json_response([
                 "success" => true
             ], 201);
             
-            $stmt->close(); 
-
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[service_create]'), 500);
         }
@@ -138,24 +117,11 @@ class ServiceController{
         try {
             $db = get_db();
 
-            $stmt = $db->prepare("
-                UPDATE Service
-                SET service_name = ?,
-                    price        = ?,
-                    duration_min = ?
-                WHERE service_id  = ?
-            ");
+            $repo = new ServiceRepository($db);
+            $services = $repo->update($service_id, $service_name,
+                                            $price, $duration_min);
 
-            $stmt->bind_param('ssii',
-                $service_name,
-                $price,
-                $duration_min,
-                $service_id
-            );
-
-            $stmt->execute();
-
-            if ($db->affected_rows === 0) {
+            if ($services <= 0) {
                 // 없는 ID이거나 값이 완전히 동일한 경우
                 json_response([
                     "success" => false,
@@ -170,6 +136,7 @@ class ServiceController{
             json_response([
                 "success" => true
             ], 201); // 프론트가 201을 기대하고 있으니 그대로
+
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[service_update]'), 500);
         }
@@ -182,30 +149,26 @@ class ServiceController{
     public function delete(string $serevice_id):void{
 
         // service_id검중
-        $service_id = (int)$serevice_id ?? 0;
+        $service_id = filter_var($serevice_id, FILTER_VALIDATE_INT);
 
         if ($service_id === false || $service_id <= 0) {
             json_response([
                 "success" => false,
                 "error" => ['code' => 'INVALID_REQUEST',
                             'message' => '유효하지 않은 요청입니다.']
-                ], 400);
-                return;
-            }
-
+            ], 400);
+            return;
+        }
 
         try {
             
             // DB접속
             $db = get_db();
             
-            // sql문 
-            $stmt = $db->prepare("DELETE FROM Service WHERE service_id=?");
-            // 실행
-            $stmt->bind_param('i', $service_id);
-            $stmt->execute();
+            $repo = new ServiceRepository($db);
+            $delete = $repo->delete($serevice_id);
 
-            if ($db->affected_rows === 0){
+            if ($delete <= 0){
                 json_response([
                     "success" => false,
                     "error" => ['code' => 'RESOURCE_NOT_FOUND',
@@ -216,8 +179,8 @@ class ServiceController{
 
             // 성공
             json_response([
-            "success" => true,
-        ], 204);   
+                "success" => true,
+            ], 204);   
 
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[service_delete]'), 500);
