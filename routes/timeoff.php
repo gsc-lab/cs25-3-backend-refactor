@@ -28,7 +28,7 @@ function registerTimeoff(AltoRouter $router): void {
     // =======================================
      // designer 휴무 수정 (login) (manager)
     // ======================================= 
-    $router->map('PUT', "/timeoff/update/[a:designer_id]",[
+    $router->map('PUT', "/timeoff/update/[a:to_id]",[
                 'controller' => 'TimeoffController',
                 'action'     => 'update',
                 'middleware' => ['login', 'manager']
