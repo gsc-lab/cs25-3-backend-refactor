@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Repository\TimeoffRepository;
 use App\Errors\ErrorHandler;
 use Throwable;
 
@@ -17,31 +18,13 @@ class TimeoffController {
         
         try {
             $db = get_db(); // DB 연결
-
-            // TimeOff 테이블에서 전체 휴무 조회 + 정렬
-            $stmt = $db->prepare("SELECT 
-                                    t.to_id,
-                                    u.user_name,
-                                    t.user_id, 
-                                    t.start_at, 
-                                    t.end_at              
-                                FROM TimeOff AS t
-                                JOIN Users AS u
-                                    ON t.user_id = u.user_id
-                                ORDER BY t.start_at ASC, t.user_id ASC");
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            // 조회된 데이터를 배열에 담기
-            $timeoff = [];
-            while ($row = $result->fetch_assoc()){
-                array_push($timeoff, $row);
-            }
+            $repo = new TimeoffRepository($db);
+            $result = $repo->index();
 
             // 성공 응답 반환
             json_response([
                 'success' => true,
-                'data' => ['timeoff' => $timeoff]
+                'data' => ['timeoff' => $result]
             ]);
         
         // 예외 처리 (서버내 오류 발생지) 
@@ -76,12 +59,8 @@ class TimeoffController {
         try {
             
             $db = get_db(); // DB 연결
-
-            // INSERT 문 작성
-            $stmt = $db->prepare("INSERT INTO TimeOff (user_id, start_at, end_at) 
-                                    VALUES (?,?,?)");
-            $stmt->bind_param('iss', $user_id, $start_at, $end_at);
-            $stmt->execute(); // 실행
+            $repo = new TimeoffRepository($db);
+            $repo->create($user_id, $start_at, $end_at);
 
             // 성공 응답
             json_response([
@@ -130,29 +109,15 @@ class TimeoffController {
                 ], 400);
             return;
         }
-        // update한 데이터를 넣는 리스트
-        $timeoff = [];
-        
-        // key = value 형태로 리스트에 저장
-        foreach ($data as $key => $value) {
-                $value = "?";
-                $timeoff_value = $key."=".$value;
-                array_push($timeoff, $timeoff_value);   
-        }
 
         try {
             // DB 접속
             $db = get_db();
+            $repo = new TimeoffRepository($db);
+            $result = $repo->update($to_id, $start_at, $end_at);
 
-            // UPDATE SQL문 => imploder() 사용
-            $stmt = $db->prepare("UPDATE TimeOff SET "
-                                .implode(",", $timeoff). 
-                                " WHERE to_id=?");               
-            $stmt->bind_param('ssi', $start_at, $end_at, $to_id);
-            $stmt->execute();
-            
             // 수정된 행이 없다면 데이터 없음 처리
-            if ($stmt->affected_rows === 0) {
+            if ($result <= 0) {
                 json_response([                  
                      "success" => false,
                      "error" => ['code' => 'NO_CHANGES_APPLIED',
@@ -194,15 +159,11 @@ class TimeoffController {
         try {
 
             $db = get_db(); // DB 연결
-
-            // delete문 SQL
-            $stmt = $db->prepare("DELETE FROM TimeOff WHERE to_id=?");
-            $stmt->bind_param('i',$to_id);
-            // 실행
-            $stmt->execute();
+            $repo = new TimeoffRepository($db);
+            $result = $repo->delete($to_id);
 
             // 삭제된 행이 없으면 오류
-            if ($stmt->affected_rows === 0){
+            if ($result <= 0){
                     json_response([
                      "success" => false,
                      "error" => ['code' => 'RESOURCE_NOT_FOUND',
