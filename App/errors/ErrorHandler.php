@@ -9,7 +9,7 @@ class ErrorHandler{
     // 서버 오류 (500)
     public static function server (Throwable $e, string $tag = 'server_error') :array
     {
-        error_log("$tag". $e->getMessage());
+        error_log("$tag". $e->getMessage() . "\n" . $e->getTraceAsString());
 
         return[
             'success' => false,
