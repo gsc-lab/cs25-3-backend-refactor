@@ -37,10 +37,6 @@ function run_middlewares(array $middlewares): void
             case 'manager':
                 require_role(['manager']);
                 break;
-
-            case 'designer_or_client':
-                require_role(['designer', 'client']);
-                break;
             
             case 'guest':
                 require_guest();
