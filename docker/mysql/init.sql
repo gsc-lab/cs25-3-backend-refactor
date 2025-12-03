@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS Reservation (
         ON DELETE CASCADE,
     CONSTRAINT FK_reservation_designer 
         FOREIGN KEY (designer_id) REFERENCES Users(user_id)  
+        ON DELETE CASCADE
 );
 
 -- 예약 내목
