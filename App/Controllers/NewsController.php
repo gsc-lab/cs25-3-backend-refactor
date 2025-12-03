@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Repository\NewsRepository;
 use App\Errors\ErrorHandler;
 use App\Services\ImageService;
 use RuntimeException;
@@ -15,6 +16,7 @@ class NewsController {
 
     // ==========================
     // 'POST' -> news 글 작성하기
+    // - 이미지 파일은 선택적(optional)
     // ==========================
     public function create():void{
          
@@ -27,60 +29,62 @@ class NewsController {
             if ($title === '' || $content === '') {
                 json_response([
                     'success' => false,
-                    'error' => ['code' => 'VALIDATION_ERROR', 
-                                'message' => '필수 필드가 비었습니다.'
-                ]], 400);
-                return;
-            }
-
-            // 파일이 전달되었는지 확인
-            if (!isset($_FILES['image'])) {
-                json_response([
-                    'success' => false,
-                    'error' => [
-                        'code' => 'NO_FILE',
-                        'message' => 'image 파일이 전달되지 않았습니다.']
-                ], 400);
-                return;
-            }
-
-            // 업로드된 파일 정보
-            $file = $_FILES['image'];
-
-            // MIME 타입 체크 → 이미지인지 검사
-            $mime = mime_content_type($file['tmp_name']) ?: '';
-            if (strpos($mime, 'image/') !== 0) {
-                json_response([
-                    'success' => false,
                     'error'   => [
-                        'code'    => 'INVALID_MIME',
-                        'message' => '이미지 파일만 업로드할 수 있습니다.',
-                        ],
+                        'code'    => 'VALIDATION_ERROR', 
+                        'message' => '필수 필드가 비었습니다.'
+                    ]
                 ], 400);
                 return;
             }
 
-            // 이미지 업로드 서비스 호출
-            $imageService = new ImageService();
-            $uploadResult = $imageService->upload($file, 'news');
+            // 필수 조건 필드 INSERT문 setup
+            $values = "?,?";
+            $colum = "title, content";
+            $params = [$title, $content];
+            $types = "ss";
             
-            // 업로드 후 반환된 파일의 key, url
-            $fileKey     = $uploadResult['key'];
-            $fileUrl     = $uploadResult['url'];
-    
-            // DB 접속
-            $db = get_db();
+            // 파일이 전달되었는지 확인(필수 조건이 아니기 때문에 있으면 추가)
+            if (isset($_FILES['image'])) {
+                
+                // 업로드된 파일 정보
+                $file = $_FILES['image'];
 
-            // sql문
-            $stmt = $db->prepare("INSERT INTO News 
-                                (title,  content, file, file_key) 
-                                VALUES (?,?,?, ?)");
-            $stmt->bind_param('ssss',$title, $content, $fileUrl, $fileKey);
-            $stmt->execute();
+                // MIME 타입 체크 → 이미지인지 검사
+                $mime = mime_content_type($file['tmp_name']) ?: '';
+                if (strpos($mime, 'image/') !== 0) {
+                    json_response([
+                        'success' => false,
+                        'error'   => [
+                            'code'    => 'INVALID_MIME',
+                            'message' => '이미지 파일만 업로드할 수 있습니다.',
+                            ],
+                    ], 400);
+                    return;
+                }
+
+                // 이미지 업로드 서비스 호출
+                $imageService = new ImageService();
+                $uploadResult = $imageService->upload($file, 'news');
+                
+                // 업로드 후 반환된 파일의 key, url
+                $fileKey    = $uploadResult['key'];
+                $fileUrl    = $uploadResult['url'];
+
+                // INSERT 문구에서 추가
+                array_push($params, $fileUrl, $fileKey);
+                $colum .= ", file, file_key";
+                $values .= ", ?, ?";
+                $types .= "ss";
+            }
+            
+            $db = get_db(); // DB 접속
+            $repo = new NewsRepository($db); // Repository 호출
+            $repo->create($params, $colum, $values, $types);
 
             // 프론트엔드에 반환하는 값
             json_response([
-                'success' => true
+                'success' => true,
+                'message' => 'News작성 성공했습니다.'
             ],201);
 
         // 예외 처리
@@ -97,7 +101,6 @@ class NewsController {
          } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[news_create]'),500);
         }
-
     }
 
     // ==========================
@@ -106,7 +109,6 @@ class NewsController {
     public function index():void
     {
         try {
-            $db = get_db();
 
             // 쿼리스트링 limit 파라미터 처리
             $limit = null;
@@ -114,23 +116,9 @@ class NewsController {
                 $limit = filter_var($_GET['limit'], FILTER_VALIDATE_INT);
             }
 
-            // 기본 쿼리
-            $sql = "SELECT * FROM News ORDER BY news_id DESC";
-            if ($limit !== null) {
-                $sql .= " LIMIT ?";
-            }
-
-            $stmt = $db->prepare($sql);
-            if ($limit !== null) {
-                $stmt->bind_param('i', $limit);
-            }
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            $news = [];
-            while ($row = $result->fetch_assoc()) {
-                $news[] = $row;
-            }
+            $db = get_db(); 
+            $repo = new NewsRepository($db);
+            $news = $repo->index($limit);
 
             json_response([
                 "success" => true,
@@ -140,61 +128,54 @@ class NewsController {
          } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[news_index]'),500);
         }
-
     }
 
 
     // =========================
     // 'GET' => 해당 글 자세히 보기
     // =========================
-    public function show(string $news_id):void {
+    public function show(string $newsId):void {
         
-        // news_id를 받는다
-        $news_id = filter_var($news_id, FILTER_VALIDATE_INT);
+        // newsId를 받는다
+        $newsId = filter_var($newsId, FILTER_VALIDATE_INT);
 
         // 유호성 검중
-        if ($news_id === false || $news_id <= 0) {
+        if ($newsId === false || $newsId <= 0) {
             json_response([
                  "success" => false,
-                 "error" => ['code' => 'INVALID_ID',
-                            'message' => '유효하지 않은 ID입니다.']
+                 "error"   => [
+                    'code'    => 'INVALID_ID',
+                    'message' => '유효하지 않은 ID입니다.']
             ], 400);
             return;
         }
         
         try {
-            // DB접속
-            $db = get_db();
 
-            // 해당 news 글을 가져오기
-            // SQL문
-            $stmt = $db->prepare("SELECT * FROM News WHERE news_id=?"); 
-            $stmt->bind_param('i',$news_id);
-            $stmt->execute();
-
-            // 해당 데이터를 가져 오기
-            $result = $stmt->get_result();
-            $row = $result->fetch_assoc();
+            $db = get_db(); 
+            $repo = new NewsRepository($db);
+            $row = $repo->show($newsId);
 
             // 요청한 news글을 찾을 수 없었을 때
             if (!$row) {
                 json_response([
                     "success" => false,
-                    "error" => [
+                    "error"   => [
                         'code'    => 'RESOURCE_NOT_FOUND',
-                        'message' => '요청한 리소스를 찾을 수 없습니다.']
+                        'message' => '요청한 리소스를 찾을 수 없습니다.'
+                    ]
                 ], 404);
                 return;
             }
-            
-            $stmt->close();
 
+            
             // 값을 프런트에 보내기
             json_response([
                 "success" => true,
                 "data"    => ['news' => $row]
             ]);
 
+            
          } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[news_show]'),500);
         }
@@ -204,18 +185,21 @@ class NewsController {
 
     // =========================
     // 'PUT' -> 해당 글을 Update
+    // → 글 제목(title)과 내용(content)만 수정
     // =========================
-    public function update(string $news_id):void{
+    public function update(string $newsId):void{
         
         // ID를 정수로 변환 및 유효성 검사
-        $news_id = filter_var($news_id, FILTER_VALIDATE_INT);
+        $newsId = filter_var($newsId, FILTER_VALIDATE_INT);
 
         // 유호성 검중
-        if ($news_id === false || $news_id <= 0) {
+        if ($newsId === false || $newsId <= 0) {
                 json_response([
                  "success" => false,
-                 "error" => ['code' => 'INVALID_ID',
-                            'message' => '유효하지 않은 ID입니다.']
+                 "error"   => [
+                    'code'    => 'INVALID_ID',
+                    'message' => '유효하지 않은 ID입니다.'
+                    ]
             ], 400);
             return;
         }
@@ -228,68 +212,47 @@ class NewsController {
             json_response([
                 'success'  => false,
                 'error'    => [
-                    'code'   => 'INVALID_REQUEST_BODY',
+                    'code'    => 'INVALID_REQUEST_BODY',
                     'message' => 'JSON 형식의 요청 본문이 필요합니다.',
                 ],
             ], 400);
             return;
         }
             
-        // 수정 가능한 필드 목록
-        $fields = [];
-        $params = [];
-        $types = '';
-        $allowed = ['title', 'content'];
-
-        // allowed 배열에 있는 값만 업데이트
-        foreach ($allowed as $field) {
-            if (array_key_exists($field, $data)) {
-                $value = trim((string)$data[$field]);
-                
-                // 값이 비어 있으면 오류 반환
-                if ($value === '') {
-                    json_response([
-                        "success" => false,
-                        "error" => [
-                                'code' => 'VALIDATION_ERROR', 
-                                'message' => '필수 필드가 비었습니다.'
-                        ]
-                ], 400);
-                return;
-                }
-                // SQL 세팅
-                $fields[] = $field . ' = ?'; 
-                $params[] = $value;
-                $types   .= 's';
-            }
+        $title   = isset($data['title']) ? (string)$data['title'] : '' ;
+        $content = isset($data['content']) ? (string)$data['content'] : '' ;
+            
+        // 값이 비어 있으면 오류 반환
+        if ($title === '' || $content == '') {
+            json_response([
+                "success" => false,
+                "error" => [
+                        'code' => 'VALIDATION_ERROR', 
+                        'message' => '필수 필드가 비었습니다.'
+                ]
+            ], 400);
+            return;
         }
-        
+
         try {
 
             // DB 접속
             $db = get_db();
-
-            // update SQL문
-            $stmt = $db->prepare("UPDATE News SET "
-                                . implode(',', $fields). 
-                                  " WHERE news_id=?");
-            // 마지막에 news_id 추가
-            $types .= 'i';
-            $params[] = $news_id;
-            // 가변 인자 바인딩
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
-
-            $stmt->close();
-
-            // update 정보 가져오기
-            $stmt2 = $db->prepare("SELECT * FROM News WHERE news_id = ?");
-            $stmt2->bind_param('i',$news_id);
-            $stmt2->execute();
-            $result = $stmt2->get_result();
-            $row = $result->fetch_assoc(); 
-            $stmt2->close();
+            $repo = new NewsRepository($db);
+            $repo->updateTextOnly($newsId, $title, $content);
             
+            // update한 글을 찾아 오기
+            $row = $repo->show($newsId);
+            if (!$row) {
+                json_response([
+                    "success" => false,
+                    "error" => [
+                        'code'    => 'RESOURCE_NOT_FOUND',
+                        'message' => '요청한 리소스를 찾을 수 없습니다.']
+                ], 404);
+                return;
+            }
+                
             // update date데이터를 반환
             json_response([
                 'success' => true,
@@ -299,7 +262,6 @@ class NewsController {
          } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[news_update]'),500);
         }
-
     }
 
 
@@ -310,13 +272,13 @@ class NewsController {
     // --- updateImage 메서드는 뉴스 글의 '이미지만' 수정하는 기능을 담당합니다.
     // --- 클라이언트는 PUT /news/{id}/image 와 같은 요청을 보내며
     // --- 새로운 이미지를 업로드하면, 기존 이미지를 삭제하고 새 이미지로 교체합니다.
-    public function updateImage (string $news_id):void {
+    public function updateImage (string $newsId):void {
         
-        // 전달받은 news_id가 정수(Integer)인지 확인
-        $news_id = filter_var($news_id, FILTER_VALIDATE_INT);
+        // 전달받은 newsId가 정수(Integer)인지 확인
+        $newsId = filter_var($newsId, FILTER_VALIDATE_INT);
 
         // 유호성 검중
-        if ($news_id === false || $news_id <= 0) {
+        if ($newsId === false || $newsId <= 0) {
                 json_response([
                  "success" => false,
                  "error" => ['code' => 'INVALID_ID',
@@ -342,12 +304,8 @@ class NewsController {
             $db = get_db(); // DB 연결
 
             // 해당 글이 실제 DB에 존재하는지 조회
-            $stmt = $db->prepare("SELECT * FROM News WHERE news_id = ?");
-            $stmt->bind_param('i', $news_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $current = $result->fetch_assoc();
-
+            $newsRepo = new NewsRepository($db);
+            $current = $newsRepo->show($newsId);
 
             // DB에 해당 글이 없을 경우 404 반환
             if (!$current) {
@@ -393,20 +351,16 @@ class NewsController {
             }
 
             // DB에 새로운 이미지 정보 업데이트
-            $stmt2 = $db->prepare("UPDATE News SET 
-                                    file = ?, file_key = ? 
-                                WHERE news_id = ?");
-            $stmt2->bind_param('ssi', $newUrl, $newKey, $news_id);
-            $stmt2->execute();
+            $newsRepo->updateImageOnly($newsId, $newUrl, $newKey);
 
             json_response([
-                'success' => true
+                'success' => true,
+                'message' => '수정 성공했습니다'
             ]);
 
          } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[news_updateImage]'),500);
-        }
-         
+        } 
     }
 
 
@@ -415,13 +369,13 @@ class NewsController {
     // =====================
     // DELETE /news/{id} 요청으로 뉴스 글을 삭제하고
     // 해당 글에 연결된 이미지 파일도 R2에서 함께 삭제합니다.
-    public function delete(string $news_id):void{
+    public function delete(string $newsId):void{
         
-        // news_id 받기
-        $news_id = filter_var($news_id, FILTER_VALIDATE_INT);
+        // newsId 받기
+        $newsId = filter_var($newsId, FILTER_VALIDATE_INT);
         
         // id 유호성 검중
-        if ($news_id === false || $news_id <= 0) {
+        if ($newsId === false || $newsId <= 0) {
             json_response([
                  "success" => false,
                  "error" => ['code' => 'INVALID_ID',
@@ -433,16 +387,12 @@ class NewsController {
         try {
             // $db접속
             $db = get_db();
-
             // 삭제 전에 파일 키(file_key)를 조회
-            $stmt = $db->prepare("SELECT file_key FROM News WHERE news_id = ?");
-            $stmt->bind_param('i', $news_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row = $result->fetch_assoc();
-
+            $repo = new NewsRepository($db);
+            $fileKey = $repo->findFileKey($newsId);
+            
             // 삭제할 글이 존재하지 않는 경우
-            if (!$row) {
+            if ($fileKey === null) {
                 json_response([
                     'success' => false,
                     'error'   => [
@@ -452,8 +402,6 @@ class NewsController {
                 ], 404);
                 return;
             }
-
-            $fileKey = $row['file_key'] ?? null;
 
             // 이미지 파일이 있을 경우 삭제 시도
             if ($fileKey) {
@@ -466,16 +414,16 @@ class NewsController {
             }
 
             // news 테이블에서 해당 글을 삭제 하기
-            $stmt2 = $db->prepare("DELETE FROM News WHERE news_id =?");
-            $stmt2->bind_param('i', $news_id);
-            $stmt2->execute();
+            $delete = $repo->delete($newsId);
             
             // DELETE SQL문의 영향을 받는 행이 없으면 삭제할 데이터 없음
-            if ($db->affected_rows === 0) {
+            if ($delete === 0) {
                 json_response([
                      "success" => false,
-                     "error" => ['code' => 'RESOURCE_NOT_FOUND',
-                                'message' => '삭제할 데이터를 찾을 수 없습니다.']
+                     "error"   => [
+                        'code'    => 'RESOURCE_NOT_FOUND',
+                        'message' => '삭제할 데이터를 찾을 수 없습니다.'
+                        ]
                 ], 404);
                 return;
             }
@@ -484,13 +432,9 @@ class NewsController {
                      "success" => true
                 ],204);
 
-            $stmt2->close();
          } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[news_delete]'),500);
         }
-
     }  
 
 }
-
-?>
