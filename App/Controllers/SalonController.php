@@ -51,11 +51,9 @@ class SalonController {
 
             $intro         = $data['introduction'] ?? '';
             $info          = json_encode($data['information']) ?? '';
-            $map           = $data['map'] ?? '';
             $traffic       = json_encode($data['traffic']) ?? '';
 
-            if ($intro === '' || $info === '' || 
-                $map === '' || $traffic === '') {
+            if ($intro === '' || $info === '' ||  $traffic === '') {
                 json_response([
                     'success' => false,
                     'error' => ['code' => 'INVALID_REQUEST',
@@ -66,7 +64,7 @@ class SalonController {
  
             $db = get_db();
             $repo = new SalonRepository($db);
-            $repo->updateTextOnly($intro, $info, $map, $traffic);
+            $repo->updateTextOnly($intro, $info, $traffic);
            
             json_response([
                 'success' => true,
