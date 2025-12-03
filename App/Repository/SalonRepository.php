@@ -35,18 +35,16 @@ class SalonRepository {
     public function updateTextOnly(
         string $intro,
         string $info,
-        string $map,
         string $traffic
     ):bool {
 
         $stmt = $this->db->prepare("UPDATE Salon SET
                                     introduction = ?,
                                     information  = ?,
-                                    map          = ?,
                                     traffic      = ?
                                     ");
-        $stmt->bind_param('ssss',
-                    $intro,$info, $map, $traffic);
+        $stmt->bind_param('sss',
+                    $intro,$info, $traffic);
         
 
         // execute()는 true/false 반환
