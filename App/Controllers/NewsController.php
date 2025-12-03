@@ -391,18 +391,6 @@ class NewsController {
             $repo = new NewsRepository($db);
             $fileKey = $repo->findFileKey($newsId);
             
-            // 삭제할 글이 존재하지 않는 경우
-            if ($fileKey === null) {
-                json_response([
-                    'success' => false,
-                    'error'   => [
-                        'code'    => 'RESOURCE_NOT_FOUND',
-                        'message' => '삭제할 데이터를 찾을 수 없습니다.',
-                    ],
-                ], 404);
-                return;
-            }
-
             // 이미지 파일이 있을 경우 삭제 시도
             if ($fileKey) {
                 $imageService = new ImageService();
