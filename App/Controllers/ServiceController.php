@@ -45,16 +45,18 @@ class ServiceController{
         $data = read_json_body();
 
         // 하나씩 꺼내기
-        $service_name = isset($data['service_name']) ? trim((string)$data['service_name']) : '';
+        $serviceName = isset($data['service_name']) ? trim((string)$data['service_name']) : '';
         $price        = isset($data['price']) ? trim((string)$data['price']) : '';
-        $duration_min = isset($data['duration_min']) ? trim((int)$data['duration_min']) : '';
+        $durationMin = isset($data['duration_min']) ? trim((int)$data['duration_min']) : '';
 
         // 유호성 검사
-        if ($service_name === '' || $price === '' || $duration_min === '') {
+        if ($serviceName === '' || $price === '' || $durationMin === '') {
             json_response([
                 "success" => false,
-                "error" => ['code' => 'VALIDATION_ERROR', 
-                            'message' => '필수 필드가 비었습니다.']
+                "error"   => [
+                    'code' => 'VALIDATION_ERROR', 
+                    'message' => '필수 필드가 비었습니다.'
+                    ]
             ], 400);
             return;
         }
@@ -64,10 +66,11 @@ class ServiceController{
             $db = get_db();
         
             $repo = new ServiceRepository($db);
-            $repo->create($service_name, $price, $duration_min);
+            $repo->create($serviceName, $price, $durationMin);
 
             json_response([
-                "success" => true
+                'success' => true,
+                'message' => '작성 성공했습니다.'
             ], 201);
             
         } catch (Throwable $e) {
@@ -79,16 +82,16 @@ class ServiceController{
     // ========================
     // 'PUT' -> service내용 수정
     // ========================
-    public function update(string $service_id) : void
+    public function update(string $serviceId) : void
     {
         // ID 정수 변환
-        $service_id = filter_var($service_id, FILTER_VALIDATE_INT);
+        $serviceId = filter_var($serviceId, FILTER_VALIDATE_INT);
 
-        if ($service_id === false || $service_id <= 0) {
+        if ($serviceId === false || $serviceId <= 0) {
             json_response([
                 "success" => false,
-                "error" => [
-                    "code" => "RESOURCE_NOT_FOUND",
+                "error"   => [
+                    "code"    => "RESOURCE_NOT_FOUND",
                     "message" => "요청한 리소스를 찾을 수 없습니다."
                 ]
             ], 404);
@@ -98,16 +101,16 @@ class ServiceController{
         // 프론트에서 입력 정보 받기
         $data = read_json_body();
 
-        $service_name = isset($data['service_name']) ? trim((string)$data['service_name']) : '';
+        $serviceName = isset($data['service_name']) ? trim((string)$data['service_name']) : '';
         $price        = isset($data['price']) ? trim((string)$data['price']) : '';
-        $duration_min = isset($data['duration_min']) ? (int)$data['duration_min'] : 0;
+        $durationMin = isset($data['duration_min']) ? (int)$data['duration_min'] : 0;
 
         // 유효성 검사
-        if ($service_name === '' || $price === '' || $duration_min <= 0) {
+        if ($serviceName === '' || $price === '' || $durationMin <= 0) {
             json_response([
                 "success" => false,
-                "error" => [
-                    'code' => 'VALIDATION_ERROR',
+                "error"   => [
+                    'code'    => 'VALIDATION_ERROR',
                     'message' => '필수 필드가 비었습니다.'
                 ]
             ], 400);
@@ -118,8 +121,8 @@ class ServiceController{
             $db = get_db();
 
             $repo = new ServiceRepository($db);
-            $services = $repo->update($service_id, $service_name,
-                                            $price, $duration_min);
+            $services = $repo->update($serviceId, $serviceName,
+                                            $price, $durationMin);
 
             if ($services <= 0) {
                 // 없는 ID이거나 값이 완전히 동일한 경우
@@ -146,16 +149,18 @@ class ServiceController{
     // =============================
     // 'DELETE' -> service 내용 삭제
     // =============================
-    public function delete(string $serevice_id):void{
+    public function delete(string $sereviceId):void{
 
         // service_id검중
-        $service_id = filter_var($serevice_id, FILTER_VALIDATE_INT);
+        $serviceId = filter_var($sereviceId, FILTER_VALIDATE_INT);
 
-        if ($service_id === false || $service_id <= 0) {
+        if ($serviceId === false || $serviceId <= 0) {
             json_response([
                 "success" => false,
-                "error" => ['code' => 'INVALID_REQUEST',
-                            'message' => '유효하지 않은 요청입니다.']
+                "error"   => [
+                    'code'    => 'INVALID_REQUEST',
+                    'message' => '유효하지 않은 요청입니다.'
+                    ]
             ], 400);
             return;
         }
@@ -166,13 +171,15 @@ class ServiceController{
             $db = get_db();
             
             $repo = new ServiceRepository($db);
-            $delete = $repo->delete($serevice_id);
+            $delete = $repo->delete($sereviceId);
 
             if ($delete <= 0){
                 json_response([
                     "success" => false,
-                    "error" => ['code' => 'RESOURCE_NOT_FOUND',
-                                'message' => '삭제할 데이터를 찾을 수 없습니다.']
+                    "error"   => [
+                        'code'    => 'RESOURCE_NOT_FOUND',
+                        'message' => '삭제할 데이터를 찾을 수 없습니다.'
+                        ]
                 ], 404);
                 return;
             }
@@ -188,28 +195,18 @@ class ServiceController{
     }
 
     // 'GET' -> service내용 전체 반환하기
-    public function show(string $service_id) :void {
+    public function show(string $serviceId) :void {
         
         try{
             // DB접속
             $db = get_db();
-
-            // Service테이블의 세부 내용 가져오기
-            // sql문
-            $stmt = $db->prepare("SELECT service_id, service_name, price, duration_min FROM Service WHERE service_id=?");
-            $stmt->bind_param('i', $service_id);
-            // 실행
-            $stmt->execute();
-            // 결과 받기
-            $result = $stmt->get_result();
-            
-            // 반복문을 사용해서 모든 레코드를 리스트에 넣기
-            $row = $result->fetch_assoc();
+            $repo = new ServiceRepository($db);
+            $row = $repo->show($serviceId);
             
             // 프런트엔드에 리스터를 반환
             json_response([
                 "success" => true,
-                "data" => [
+                "data" => [ 
                             'service_name' => $row['service_name'],
                             'price' => $row['price'],
                             'duration_min' => $row['duration_min']
