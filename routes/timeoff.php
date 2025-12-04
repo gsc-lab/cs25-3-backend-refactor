@@ -11,7 +11,7 @@ function registerTimeoff(AltoRouter $router): void {
     $router->map('GET', "/timeoff",[
                 'controller' => 'TimeoffController',
                 'action'     => 'index',
-                'middleware' => ['login', 'manager']
+                'middleware' => []
             ]); 
 
 
