@@ -32,6 +32,12 @@ function registerReservation(AltoRouter $router): void {
                 'action'     => 'update',
                 'middleware' => ['login', 'designer_or_client'] 
             ]); 
-}
 
+
+    $router->map('GET', "/reservation/designer", [
+                    'controller' => 'ReservationController',
+                    'action'     => 'designerDetail',
+                    'middleware' => ['login', 'client']    
+                ]); 
+}
 ?>
