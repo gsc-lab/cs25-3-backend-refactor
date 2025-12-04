@@ -42,16 +42,18 @@ class TimeoffController {
         $data = read_json_body(); // JSON 요청 파싱
         
         // 필드 값 받기 (형변환 포함)
-        $user_id   = isset($data['user_id']) ? trim((int)$data['user_id']) : '';
-        $start_at  = isset($data['start_at']) ? trim((string)$data['start_at']) : '';
-        $end_at    = isset($data['end_at']) ? trim((string)$data['end_at']) : '';
+        $userId   = isset($data['user_id']) ? trim((int)$data['user_id']) : '';
+        $startAt  = isset($data['start_at']) ? trim((string)$data['start_at']) : '';
+        $endAt    = isset($data['end_at']) ? trim((string)$data['end_at']) : '';
 
         // 필드 검증
-        if ($user_id === '' || $start_at == ''|| $end_at === '') {
+        if ($userId === '' || $startAt == ''|| $endAt=== '') {
             json_response([
                 'success' => false,
-                'error' => ['code' => 'VALIDATION_ERROR',
-                            'message' => '필수 필드가 비었습니다.']
+                'error'   => [
+                    'code'    => 'VALIDATION_ERROR',
+                    'message' => '필수 필드가 비었습니다.'
+                ]
             ], 400);
             return;
         }
@@ -60,7 +62,7 @@ class TimeoffController {
             
             $db = get_db(); // DB 연결
             $repo = new TimeoffRepository($db);
-            $repo->create($user_id, $start_at, $end_at);
+            $repo->create($userId, $startAt, $endAt);
 
             // 성공 응답
             json_response([
@@ -78,30 +80,32 @@ class TimeoffController {
     // =============================
     // 'PUT' -> designer 휴무 수정
     // =============================
-    public function update(string $to_id) :void {
+    public function update(string $toId) :void {
         
         # "10", "7", "5" -> ok, int형으로 바꿈 ,  "abc"、""、"0"、"-3" -> fals
-        $to_id = filter_var($to_id, FILTER_VALIDATE_INT);
+        $toId = filter_var($toId, FILTER_VALIDATE_INT);
 
-        if ($to_id === false || $to_id <= 0) {
+        if ($toId === false || $toId <= 0) {
             json_response([
                 'success' => false,
-                'error' => ['code' => 'RESOURCE_NOT_FOUND',
-                            'message' => '요청한 리소스를 찾을 수 없습니다.']
+                'error'   => [
+                    'code'    => 'RESOURCE_NOT_FOUND',
+                    'message' => '요청한 리소스를 찾을 수 없습니다.'
+                ]
             ], 404);
             return;
         }
 
-        $to_id = (int)$to_id; // 형변환 확정
+        $toId = (int)$toId; // 형변환 확정
         
         // 프론트에서 데이터를 받는다
         $data = read_json_body();
     
-        $start_at  = isset($data['start_at']) ? trim((string)$data['start_at']) : '';
-        $end_at    = isset($data['end_at']) ? trim((string)$data['end_at']) : '';
+        $startAt  = isset($data['start_at']) ? trim((string)$data['start_at']) : '';
+        $endAt   = isset($data['end_at']) ? trim((string)$data['end_at']) : '';
         
         // 유호성 확인
-        if ($start_at === '' || $end_at === '' ) {
+        if ($startAt === '' || $endAt=== '' ) {
             json_response([
                     'success' => false,
                     'error' => ['code' => 'VALIDATION_ERROR',
@@ -114,14 +118,15 @@ class TimeoffController {
             // DB 접속
             $db = get_db();
             $repo = new TimeoffRepository($db);
-            $result = $repo->update($to_id, $start_at, $end_at);
+            $result = $repo->update($toId, $startAt, $endAt);
 
             // 수정된 행이 없다면 데이터 없음 처리
             if ($result <= 0) {
                 json_response([                  
                      "success" => false,
-                     "error" => ['code' => 'NO_CHANGES_APPLIED',
-                                'message' => '수정된 내용이 없습니다.']
+                     "error"   => [
+                        'code'    => 'NO_CHANGES_APPLIED',
+                        'message' => '수정된 내용이 없습니다.']
                 ], 409);
                 return;
             } 
@@ -142,16 +147,18 @@ class TimeoffController {
     // ==============================
     // 'DELETE' -> designer 휴무 삭제
     // ==============================
-    public function delete(string $to_id):void{
+    public function delete(string $toId):void{
 
         // ID 정수 검증
-        $to_id = filter_var($to_id, FILTER_VALIDATE_INT);
+        $toId = filter_var($toId, FILTER_VALIDATE_INT);
         
-        if ($to_id === false || $to_id <= 0) {
+        if ($toId === false || $toId <= 0) {
             json_response([
                 'success' => false,
-                'error' => ['code' => 'RESOURCE_NOT_FOUND',
-                            'message' => '요청한 리소스를 찾을 수 없습니다.']
+                'error'   => [
+                    'code' => 'RESOURCE_NOT_FOUND',
+                    'message' => '요청한 리소스를 찾을 수 없습니다.'
+                ]
             ], 404);
             return;
         }
@@ -160,14 +167,16 @@ class TimeoffController {
 
             $db = get_db(); // DB 연결
             $repo = new TimeoffRepository($db);
-            $result = $repo->delete($to_id);
+            $result = $repo->delete($toId);
 
             // 삭제된 행이 없으면 오류
             if ($result <= 0){
                     json_response([
-                     "success" => false,
-                     "error" => ['code' => 'RESOURCE_NOT_FOUND',
-                                'message' => '삭제할 데이터를 찾을 수 없습니다.']
+                        "success" => false,
+                        "error"   => [
+                            'code' => 'RESOURCE_NOT_FOUND',
+                            'message' => '삭제할 데이터를 찾을 수 없습니다.'
+                        ]
                 ], 404);
                 return;
             }
