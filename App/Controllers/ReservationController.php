@@ -108,6 +108,91 @@ class ReservationController {
             json_response(ErrorHandler::server($e, '[Reservation_create]'),500);
         }
     } 
+
+
+    // =======================================================
+    // 'GET' -> 특정 디자이너 예약 정보 보기 (client, designer)
+    // =======================================================
+    public function designerDetail():void{
+
+        $user_id = isset($_GET['designer_id']) ? $_GET['designer_id'] : '';
+        $today = date('Y-m-d');
+
+        $time = isset($_GET['time']) ? trim($_GET['time']) : '';
+        try {
+
+            $db = get_db();
+
+            // where 조건
+            $where = " WHERE r.designer_id = ?";
+            
+            // day
+            $day = " r.day >= ? ";
+
+            $stmt = $db->prepare("SELECT 
+                                        r.reservation_id,
+                                        ud.user_name as designer_name,
+                                        r.day,
+                                        r.start_at,
+                                        r.end_at,
+                                        r.status
+                                        FROM Reservation AS r
+                                        JOIN Users AS ud -- designer
+                                            ON r.designer_id = ud.user_id
+                                        JOIN Users AS uc -- client
+                                            ON r.client_id = uc.user_id
+                                        JOIN ReservationService AS rs
+                                            ON r.reservation_id = rs.reservation_id
+                                        JOIN Service AS s
+                                            ON rs.service_id = s.service_id
+                                        $where AND $day
+                                        ORDER BY r.day, start_at");
+            $stmt->bind_param('is', $user_id, $today);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            $reservations = [];
+                                            
+            while ($row = $result->fetch_assoc()) {
+                $rid = $row['reservation_id'];
+
+                // 予約データの初期化（最初の1回だけ）
+                if (!isset($reservations[$rid])) {
+                    $reservations[$rid] = [
+                        'reservation_id' => $rid,
+                        'designer_name'  => $row['designer_name'],
+                        'day'            => $row['day'],
+                        'start_at'       => $row['start_at'],
+                        'end_at'         => $row['end_at'],
+                        'status'         => $row['status'],
+                    ];
+                }
+            }
+
+            // JSON に出す形へ変換
+            $reservations = array_values($reservations);
+
+            json_response([
+                'success' => true,
+                'data' => [
+                    'reservation' => $reservations
+                ]
+            ]);
+
+        } catch (Throwable $e) {
+            error_log('[reservation_show]'.$e->getMessage());
+            json_response([
+                "success" => false,
+                "error" => ['code' => 'INTERNAL_SERVER_ERROR', 
+                            'message' => '서버 오류가 발생했습니다.'
+                ]],500);
+                return;
+        }
+    }
+
+
+
+
     
     // ===================================================================
     // 'POST' => 예약 작성
