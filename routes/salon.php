@@ -26,7 +26,7 @@ function registerSalon(AltoRouter $router): void {
         '/salon/update',
         [
             'controller' => 'SalonController',
-            'action'     => 'update',
+            'action'     => 'updateText',
             'middleware' => ['login', 'manager']
         ]
     );
