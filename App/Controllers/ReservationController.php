@@ -47,7 +47,7 @@ class ReservationController {
             if ((int)$time === -1) {
                 $condition = " r.day < ?";
             } else {
-                $condition = " r.day > ?";
+                $condition = " r.day >= ?";
             }
 
             // designer의 경우
