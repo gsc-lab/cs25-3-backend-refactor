@@ -51,6 +51,7 @@ class DesignerRepository {
 
         $stmt = $this->db->prepare("SELECT
                                 d.designer_id,
+                                d.user_id,
                                 u.user_name,
                                 d.image,
                                 d.image_key,
