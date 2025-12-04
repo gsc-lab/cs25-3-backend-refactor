@@ -42,13 +42,12 @@ class SalonRepository {
                                     introduction = ?,
                                     information  = ?,
                                     traffic      = ?
-                                    ");
+                                    LIMIT 1");
         $stmt->bind_param('sss',
                     $intro,$info, $traffic);
-        
-
+        $stmt->execute();
         // execute()는 true/false 반환
-        return $stmt->execute();
+        return $stmt->affected_rows > 0;
     }
 
 
