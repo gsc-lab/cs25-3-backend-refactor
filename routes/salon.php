@@ -19,15 +19,27 @@ function registerSalon(AltoRouter $router): void {
     );
 
     // ================================
-    // salon 정보 수정 (login + manager)
+    // salon TEXT 정보 수정 (login + manager)
     // ================================
     $router->map(
         'PUT',
         '/salon/update',
         [
             'controller' => 'SalonController',
-            'action'     => 'update',
+            'action'     => 'updateText',
             'middleware' => ['login', 'manager']
+        ]
+    );
+
+
+    // image정보 수정 (login + manager)
+    $router->map(
+        'POST',
+        '/salon/image',
+        [
+            'controller' => 'SalonController',
+            'action'     => 'updateImage',
+            'middleware' => ['login','manager']
         ]
     );
 }

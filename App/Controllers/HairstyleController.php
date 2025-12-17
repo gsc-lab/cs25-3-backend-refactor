@@ -1,6 +1,8 @@
 <?php
 namespace App\Controllers;
 
+use App\Repository\HairstyleRepository;
+use App\Errors\ErrorHandler;
 use Throwable;
 use App\Services\ImageService; // R2 업로드/삭제용 서비스
 
@@ -9,14 +11,14 @@ require_once __DIR__ . "/../http.php";
 
 class HairstyleController
 {
-    /**
-     * GET /hairstyle
-     * 전체 목록
-     */
+
+    // =====================
+    // GET /hairstyle
+    // 전체 목록
+    // ====================
     public function index(): void
     {
         try {
-            $db = get_db();
 
             // 🔹 쿼리스트링 limit 파라미터 처리 (옵션)
             $limit = null;
@@ -28,6 +30,7 @@ class HairstyleController
                     ],
                 ]);
 
+                // limit 값이 유효하지 않을 때
                 if ($limit === false) {
                     json_response([
                         'success' => false,
@@ -40,47 +43,30 @@ class HairstyleController
                 }
             }
 
-            // 기본 쿼리
-            $sql = "SELECT * FROM HairStyle ORDER BY hair_id DESC";
-            if ($limit !== null) {
-                $sql .= " LIMIT ?";
-            }
-
-            $stmt = $db->prepare($sql);
-            if ($limit !== null) {
-                $stmt->bind_param('i', $limit);
-            }
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            $hairstyle = [];
-            while ($row = $result->fetch_assoc()) {
-                $hairstyle[] = $row;
-            }
-
+            $db = get_db();
+            $repo = new HairstyleRepository($db);
+            $hairstyle = $repo->index($limit);
+            
             json_response([
                 'success' => true,
                 'data'    => ['hairstyle' => $hairstyle],
             ]);
-        } catch (Throwable $e) {
-            error_log('[hairstyle_index] ' . $e->getMessage());
 
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[hairstyle_index]'),500);
         }
     }
 
-    // 'GET' => 특정 게시물 조회
-    public function show(string $hair_id): void
+    // ==========================
+    // GET /hairstyle/{hair_id}
+    // 개별 헤어스타일 조회
+    // ==========================
+    public function show(string $hairId): void
     {
-        $id = (int)$hair_id;
+        // hairId 유효성 검사
+        $hairId = filter_var($hairId, FILTER_VALIDATE_INT);
 
-        if ($id <= 0) {
+        if ($hairId === false || $hairId <= 0) {
             json_response([
                 'success' => false,
                 'error' => [
@@ -93,13 +79,12 @@ class HairstyleController
 
         try {
             $db = get_db();
+            $repo = new HairstyleRepository($db);
 
-            $stmt = $db->prepare("SELECT * FROM HairStyle WHERE hair_id = ?");
-            $stmt->bind_param('i', $id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row = $result->fetch_assoc();
+            // 대상 데이터 조회
+            $row = $repo->show($hairId);
 
+            // 존재하지 않는 경우
             if (!$row) {
                 json_response([
                     'success' => false,
@@ -115,25 +100,18 @@ class HairstyleController
                 'success' => true,
                 'data'    => ['hairstyle' => $row],
             ]);
-        } catch (\Throwable $e) {
-            error_log('[hairstyle_show] ' . $e->getMessage());
 
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[hairstyle_show]'),500);
         }
     }
 
 
-    /**
-     * POST /hairstyle/create
-     * 새 헤어스타일 등록 (이미지 업로드 포함)
-     * - body: multipart/form-data (title, description, image)
-     */
+    // =====================================================
+    // POST /hairstyle/create
+    // 새 헤어스타일 등록 (이미지 업로드 포함)
+    // - multipart/form-data (title, description, image)
+    // =====================================================
     public function create(): void
     {
         try {
@@ -152,6 +130,7 @@ class HairstyleController
                 return;
             }
 
+            // 이미지 파일 존재 확인
             if (!isset($_FILES['image'])) {
                 json_response([
                     'success' => false,
@@ -165,7 +144,7 @@ class HairstyleController
 
             $file = $_FILES['image'];
 
-            // (선택) MIME 검사
+            // MIME 타입 검사 (이미지 파일인지 검증)
             $mime = mime_content_type($file['tmp_name']) ?: '';
             if (strpos($mime, 'image/') !== 0) {
                 json_response([
@@ -182,44 +161,22 @@ class HairstyleController
             $imageService = new ImageService();
             // → ['key' => '폴더/파일명.png', 'url' => 'https://...r2.dev/...']
             $uploadResult = $imageService->upload($file, 'hairstyle');
-            $imageKey     = $uploadResult['key'];
-            $imageUrl     = $uploadResult['url'];
+            
+            $imageKey     = $uploadResult['key']; // R2 key
+            $imageUrl     = $uploadResult['url']; // 공개 URL
 
             // 3) DB INSERT (image: URL, image_key: R2 object key)
             $db = get_db();
-            $stmt = $db->prepare(
-                "INSERT INTO HairStyle (title, image, image_key, description)
-                 VALUES (?, ?, ?, ?)"
-            );
-            $stmt->bind_param('ssss', $title, $imageUrl, $imageKey, $description);
-            $stmt->execute();
-
-            if ($db->affected_rows === 0) {
-                json_response([
-                    'success' => false,
-                    'error'   => [
-                        'code'    => 'NO_RECORD_INSERTED',
-                        'message' => '삽입 처리가 수행되지 않았습니다.',
-                    ],
-                ], 400);
-                return;
-            }
-
+            $repo = new HairstyleRepository($db);
+            $repo->create($title, $imageUrl, $imageKey, $description);
+          
             json_response([
                 'success' => true,
-                'data'    => [
-                    'hairstyle' => [
-                        'hair_id'     => $db->insert_id,
-                        'title'       => $title,
-                        'image'       => $imageUrl,
-                        'image_key'   => $imageKey,
-                        'description' => $description,
-                    ],
-                ],
+                'message' => '작성 성공했습니다' 
             ], 201);
+
         } catch (\RuntimeException $e) {
             error_log('[hairstyle_create_runtime] ' . $e->getMessage());
-
             json_response([
                 'success' => false,
                 'error'   => [
@@ -227,43 +184,34 @@ class HairstyleController
                     'message' => '이미지 업로드에 실패했습니다.',
                 ],
             ], 400);
-        } catch (\Throwable $e) {
-            error_log('[hairstyle_create] ' . $e->getMessage());
-
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[hairstyle_create]'),500);
         }
     }
 
-    /**
-     * PUT /hairstyle/update/{hair_id}
-     * 텍스트 정보 수정 (title, description)
-     *  - body: JSON
-     *  - 이미지는 그대로 두고 싶을 때 사용
-     *  ※ 이미지까지 변경하고 싶으면 아래 updateImage() 같은 별도 엔드포인트 쓰는 게 깔끔함
-     */
-    public function update(string $hair_id): void
+    // =====================================
+    // PUT /hairstyle/update/{hair_id}
+    // 텍스트 정보만 수정 (title, description)
+    // ======================================
+    public function update(string $hairId): void
     {
-        $id = (int)$hair_id;
+        $hairId = filter_var($hairId, FILTER_VALIDATE_INT);
 
-        if ($id <= 0) {
+        // ID 유효성 검사
+        if ($hairId === false || $hairId <= 0) {
             json_response([
                 'success' => false,
                 'error'   => [
                     'code'    => 'INVALID_REQUEST',
-                    'message' => '유효하지 않은 요청입니다.',
-                ],
+                    'message' => '유효하지 않은 요청입니다.'
+                ]
             ], 400);
             return;
         }
 
         try {
-            $data = read_json_body(); // { "title": "...", "description": "..." }
+
+            $data = read_json_body();
 
             if (!is_array($data)) {
                 json_response([
@@ -276,121 +224,49 @@ class HairstyleController
                 return;
             }
 
-            $fields = [];
-            $params = [];
-            $types  = '';
-
-            // 수정 가능 필드만 허용
-            $allowed = ['title', 'description'];
-
-            foreach ($allowed as $field) {
-                if (array_key_exists($field, $data)) {
-                    $value = trim((string)$data[$field]);
-                    if ($value === '') {
-                        json_response([
-                            'success' => false,
-                            'error'   => [
-                                'code'    => 'VALIDATION_ERROR',
-                                'message' => '요청 데이터의 형식이 올바르지 않습니다.',
-                            ],
-                        ], 422);
-                        return;
-                    }
-                    $fields[] = $field . ' = ?';
-                    $params[] = $value;
-                    $types   .= 's';
-                }
-            }
-
-            if (empty($fields)) {
-                json_response([
-                    'success' => false,
-                    'error'   => [
-                        'code'    => 'NO_FIELDS_TO_UPDATE',
-                        'message' => '수정할 필드가 없습니다.',
-                    ],
-                ], 400);
-                return;
-            }
-
+            $title       = isset($data['title']) ? (string)$data['title'] : '';
+            $description = isset($data['description']) ? (string)$data['description'] : '';
+ 
             $db = get_db();
+            $repo = new HairstyleRepository($db);
 
-            // 1) UPDATE
-            $sql = "UPDATE HairStyle SET " . implode(', ', $fields) . " WHERE hair_id = ?";
-            $stmt = $db->prepare($sql);
+            // DB 업데이트
+            $repo->updateTextOnly($hairId, $title, $description);
 
-            // 타입 문자열 + id
-            $types  .= 'i';
-            $params[] = $id;
-
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
-
-            if ($db->affected_rows === 0) {
-                // 완전히 같은 값으로 보냈을 수도 있으니, 여기서는 그냥 404 대신 조회 한 번 더 해봄
-                $stmtCheck = $db->prepare("SELECT * FROM HairStyle WHERE hair_id = ?");
-                $stmtCheck->bind_param('i', $id);
-                $stmtCheck->execute();
-                $resCheck = $stmtCheck->get_result();
-                $rowCheck = $resCheck->fetch_assoc();
-
-                if (!$rowCheck) {
-                    json_response([
-                        'success' => false,
-                        'error'   => [
-                            'code'    => 'RESOURCE_NOT_FOUND',
-                            'message' => '수정할 데이터를 찾을 수 없습니다.',
-                        ],
-                    ], 404);
-                    return;
-                }
-                // row는 있는데 값이 동일해서 변경 없음 → 그냥 성공으로 응답
-            }
-
-            // 2) 수정된 데이터 다시 조회
-            $stmt2 = $db->prepare("SELECT * FROM HairStyle WHERE hair_id = ?");
-            $stmt2->bind_param('i', $id);
-            $stmt2->execute();
-            $result = $stmt2->get_result();
-            $row    = $result->fetch_assoc();
+            // 새로 갱신된 데이터 조회 후 반환
+            $row = $repo->show($hairId);
 
             json_response([
                 'success' => true,
                 'data'    => ['hairstyle' => $row],
             ]);
-        } catch (Throwable $e) {
-            error_log('[hairstyle_update] ' . $e->getMessage());
 
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[hairstyle_update]'),500);
         }
     }
 
-    /**
-     * 추가: 이미지만 교체하는 엔드포인트(원하면 사용)
-     * POST /hairstyle/{hair_id}/image
-     *  - body: multipart/form-data (image)
-     *  - 기존 R2 이미지 삭제 후 새 이미지 업로드
-     */
-    public function updateImage(string $hair_id): void
+
+    // ====================================
+    // POST /hairstyle/{hair_id}/image
+    // 기존 이미지 삭제 후 새로운 이미지 업로드
+    // ====================================
+    public function updateImage(string $hairId): void
     {
-        $id = (int)$hair_id;
-        if ($id <= 0) {
+        $hairId = filter_var($hairId, FILTER_VALIDATE_INT);
+
+        if ($hairId === false || $hairId <= 0) {
             json_response([
                 'success' => false,
                 'error'   => [
                     'code'    => 'INVALID_REQUEST',
-                    'message' => '유효하지 않은 요청입니다.',
-                ],
+                    'message' => '유효하지 않은 요청입니다.'
+                ]
             ], 400);
             return;
         }
 
+        // 이미지 파일 존재 여부 확인
         if (!isset($_FILES['image'])) {
             json_response([
                 'success' => false,
@@ -404,13 +280,10 @@ class HairstyleController
 
         try {
             $db = get_db();
+            $repo = new HairstyleRepository($db);
 
-            // 0) 기존 데이터 조회 (image_key 포함)
-            $stmt = $db->prepare("SELECT * FROM HairStyle WHERE hair_id = ?");
-            $stmt->bind_param('i', $id);
-            $stmt->execute();
-            $result  = $stmt->get_result();
-            $current = $result->fetch_assoc();
+            // 기존 데이터 조회
+            $current = $repo->show($hairId);
 
             if (!$current) {
                 json_response([
@@ -439,12 +312,12 @@ class HairstyleController
 
             $imageService = new ImageService();
 
-            // 새로 업로드
+            // 1) 새 이미지 업로드
             $uploadResult = $imageService->upload($file, 'hairstyle');
             $newKey       = $uploadResult['key'];
             $newUrl       = $uploadResult['url'];
 
-            // 기존 이미지 삭제 (실패하더라도 서비스 자체는 계속)
+            // 2) 기존 이미지 삭제 (실패해도 업데이트는 계속 진행)
             try {
                 if (!empty($current['image_key'])) {
                     $imageService->delete($current['image_key']);
@@ -453,66 +326,47 @@ class HairstyleController
                 error_log('[hairstyle_updateImage_delete_old] ' . $e->getMessage());
             }
 
-            // DB 수정
-            $stmt2 = $db->prepare(
-                "UPDATE HairStyle SET image = ?, image_key = ? WHERE hair_id = ?"
-            );
-            $stmt2->bind_param('ssi', $newUrl, $newKey, $id);
-            $stmt2->execute();
+            // 3) DB 업데이트
+            $repo->updateImageOnly($hairId, $newUrl, $newKey);
 
-            // 수정된 데이터 다시 조회
-            $stmt3 = $db->prepare("SELECT * FROM HairStyle WHERE hair_id = ?");
-            $stmt3->bind_param('i', $id);
-            $stmt3->execute();
-            $row = $stmt3->get_result()->fetch_assoc();
+            // 변경된 내용 재조회 후 반환
+            $row = $repo->show($hairId);
 
             json_response([
                 'success' => true,
                 'data'    => ['hairstyle' => $row],
             ]);
-        } catch (Throwable $e) {
-            error_log('[hairstyle_updateImage] ' . $e->getMessage());
 
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[hairstyle_updateImage]'),500);
         }
     }
 
-    /**
-     * DELETE /hairstyle/delete/{hair_id}
-     * DB 레코드 + R2 이미지 같이 삭제
-     */
-    public function delete(string $hair_id): void
+    // =============================
+    // DELETE /hairstyle/{hair_id}
+    // DB 삭제 + R2 이미지 삭제
+    // =============================
+    public function delete(string $hairId): void
     {
-        $id = (int)$hair_id;
+        $hairId = filter_var($hairId, FILTER_VALIDATE_INT);
 
-        if ($id <= 0) {
+        if ($hairId === false || $hairId <= 0) {
             json_response([
                 'success' => false,
                 'error'   => [
                     'code'    => 'INVALID_REQUEST',
-                    'message' => '유효하지 않은 요청입니다.',
-                ],
+                    'message' => '유효하지 않은 요청입니다.'
+                ]
             ], 400);
             return;
         }
 
         try {
             $db = get_db();
+            $repo = new HairstyleRepository($db);
 
-            // 0) 먼저 image_key 조회
-            $stmt = $db->prepare(
-                "SELECT image_key FROM HairStyle WHERE hair_id = ?"
-            );
-            $stmt->bind_param('i', $id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row    = $result->fetch_assoc();
+            // 삭제 대상 존재 여부 확인
+            $row = $repo->show($hairId);
 
             if (!$row) {
                 json_response([
@@ -525,6 +379,7 @@ class HairstyleController
                 return;
             }
 
+            // 1) R2 이미지 삭제
             $imageKey = $row['image_key'] ?? null;
 
             // 1) R2 이미지 삭제
@@ -534,17 +389,14 @@ class HairstyleController
                     $imageService->delete($imageKey);
                 } catch (Throwable $e) {
                     error_log('[hairstyle_delete_image] ' . $e->getMessage());
-                    // 정책에 따라 여기서 바로 500을 줄 수도 있고,
-                    // 일단 레코드는 삭제하고 나중에 orphan 정리하는 식으로 갈 수도 있음
+                    // R2 삭제 실패해도 DB 삭제는 계속 진행
                 }
             }
 
             // 2) DB 삭제
-            $stmt2 = $db->prepare("DELETE FROM HairStyle WHERE hair_id = ?");
-            $stmt2->bind_param('i', $id);
-            $stmt2->execute();
-
-            if ($db->affected_rows === 0) {
+            $result = $repo->delete($hairId);
+            
+            if ($result === 0) {
                 json_response([
                     'success' => false,
                     'error'   => [
@@ -557,16 +409,9 @@ class HairstyleController
 
             // 보통 삭제 성공 시 204 사용
             http_response_code(204);
-        } catch (Throwable $e) {
-            error_log('[hairstyle_delete] ' . $e->getMessage());
 
-            json_response([
-                'success' => false,
-                'error'   => [
-                    'code'    => 'INTERNAL_SERVER_ERROR',
-                    'message' => '서버 오류가 발생했습니다.',
-                ],
-            ], 500);
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e, '[hairstyle_delete]'),500);
         }
     }
 }

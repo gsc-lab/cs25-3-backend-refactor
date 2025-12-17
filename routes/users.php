@@ -32,12 +32,12 @@ function registerUsers(AltoRouter $router): void {
             ]);
 
     // ============================
-    // 회원 탈퇴 (login필수)(client 만)
+    // 회원 탈퇴 (login필수)(client, designer 만)
     // ============================
     $router->map('DELETE', "/users/delete",
      [  'controller' => 'UsersController',
                 'action'     => 'delete',
-                'middleware' => ['login', 'client']
+                'middleware' => ['login', ['designer','client']]
             ]); 
             
     // ==============

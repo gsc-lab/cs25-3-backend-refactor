@@ -1,14 +1,17 @@
 <?php
 
 namespace App\Controllers;
+
+use App\Repository\UsersRepository;
+use App\Errors\ErrorHandler;
 use Throwable;
+
 // DB 로딩
 require_once __DIR__."/../db.php";
 // http.php 불러오기
 require_once __DIR__."/../http.php";
 
-class UsersController
-{
+class UsersController {
 
 
     // ======================
@@ -21,14 +24,10 @@ class UsersController
         try {
             // DB접속
             $db = get_db();
-            // SQL문 (SELECT)
-            $stmt = $db->prepare("SELECT user_name, gender, phone, birth, created_at
-                                         FROM Users WHERE user_id=?");
-            $stmt->bind_param('i',$user_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
+            $repo = new UsersRepository($db);
+            $result = $repo->show($user_id);
             
-            if($result->num_rows === 0){ 
+            if($result === null){ 
                 json_response([
                     'success' => false,
                     'error' => ['code' => 'USER_NOT_FOUND', 
@@ -37,22 +36,15 @@ class UsersController
                 return;
             }
             
-            $row = $result->fetch_assoc();
             json_response([
                 'success' => true,
-                'data' => ['user' => $row]
+                'data' => ['user' => $result]
             ]);
         
             // 오류시 
         } catch (Throwable $e) {
-            error_log('[users_show]'. $e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 오류가 발생했습니다.']
-                ], 500);
-                return;
-            }     
+            json_response(ErrorHandler::server($e,'[users_show]'), 500);
+        }     
     }
 
     // ====================
@@ -86,13 +78,11 @@ class UsersController
 
             // DB접속
             $db = get_db();
-            $stmtSelect = $db->prepare("SELECT 1 FROM Users WHERE account=? LIMIT 1");
-            $stmtSelect->bind_param('s', $account);
-            $stmtSelect->execute();
-            $result = $stmtSelect->get_result();
-            
+            $repo = new UsersRepository($db);
+            $result = $repo->accountCheck($account);
+
             // 중복된 account 여부를 확인
-            if ($result->num_rows > 0){
+            if ($result){
                 echo json_response([
                     'success' => false,
                     'error' => ['code' => 'ACCOUNT_DUPLICATED',
@@ -103,26 +93,16 @@ class UsersController
             
             // 없으면 password hash처리해 저장
             $password_hash = password_hash($password_raw, PASSWORD_DEFAULT);
-            
-            $stmtInsert = $db->prepare("INSERT INTO Users
-                                        (account, password, user_name, role, gender, phone, birth)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmtInsert->bind_param('sssssss', $account, $password_hash, $user_name, $role, $gender, $phone, $birth);
-            $stmtInsert->execute();
-            
-
+            $repo->create($account, $password_hash, 
+                                    $user_name, $role, $gender, $phone, $birth);
+        
             json_response([
                 'success' => true
             ], 201);
             
 
         } catch (Throwable $e) {
-            error_log('[users_create]' .$e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 내부 오류가 발생했습니다.']
-            ], 500);
+            json_response(ErrorHandler::server($e,'[users_create]'), 500);
         }
     } 
 
@@ -155,25 +135,14 @@ class UsersController
 
         $password_hash = password_hash($password_raw, PASSWORD_DEFAULT);
 
-        // UPDATE하기 위한 배열
-        $sets = [];
         try {
             // DB접속
             $db   = get_db();
-            
-            foreach ($data as $key => $value) {
-                $value = "?";
-                $v = $key ."=". $value;
-                array_push($sets, $v);
-            }
+            $repo = new UsersRepository($db);
+            $result = $repo->update($user_id, $account, 
+                $password_hash, $user_name, $phone);
 
-            $stmt = $db->prepare("UPDATE Users SET "
-                                . implode(",", $sets).
-                                " WHERE user_id = ?");
-            $stmt->bind_param('ssssi', $account, $password_hash, $user_name, $phone, $user_id);
-            $stmt->execute();
-
-            if ($stmt->affected_rows === 0){
+            if ($result === 0){
                 json_response([
                     "success" => false,
                     "error" => ['code' => 'NO_CHANGES_APPLIED',
@@ -182,19 +151,15 @@ class UsersController
                 return;
             }
 
-            json_response(['ok' => true]);
-
-        
-        } catch (Throwable $e) {
-            error_log('[users_update' . $e->getMessage());
             json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 내부 오류가 발생했습니다.'
-            ]], 500);
+                'success' => true,
+                'message' => '수정 성공했습니다.'
+            ]);
+
+        } catch (Throwable $e) {
+            json_response(ErrorHandler::server($e,'[users_update]'), 500);
         }
     }
-
 
     // =================
     // 'DELETE' =>  탈퇴
@@ -206,19 +171,24 @@ class UsersController
         try{
             // db 접속
             $db = get_db();
-            $stmt = $db->prepare("DELETE FROM Users WHERE user_id=?");
-            $stmt->bind_param('i',$user_id);
-            $stmt->execute();
+            $repo = new UsersRepository($db);
+            $result = $repo->delete($user_id);
+
+            if ($result <= 0) {
+                json_response([
+                     "success" => false,
+                     "error" => [
+                        'code'    => 'RESOURCE_NOT_FOUND',
+                        'message' => '삭제할 데이터를 찾을 수 없습니다.'
+                    ]
+                ], 404);
+                return;
+            }
 
             http_response_code(204);
-            return;
+ 
         } catch (Throwable $e) {
-            error_log('[users_delete]' . $e->getMessage());
-            json_response([
-                'success' => false,
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR',
-                            'message' => '서버 내부 오류가 발생했습니다.'
-            ]], 500);
+            json_response(ErrorHandler::server($e,'[users_delete]'), 500);
         }      
     } 
 
@@ -235,18 +205,6 @@ class UsersController
         $password     = isset($data['password']) ? trim((string)($data['password'])) : '' ;
         $role         = isset($data['role']) ? trim((string)($data['role'])) : '';
         
-        
-        // DB접속
-        $db = get_db();
-        // account를 불어오기
-        $stmt = $db->prepare("SELECT 
-                                    user_name, user_id, role, password, account 
-                                    FROM Users 
-                                    WHERE account=? AND role=?");
-        $stmt->bind_param('ss',$account, $role);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
         // 필수 필드가 비었습니다.
         if ($account === '' || $password === '' || $role === '') {
             echo json_response([
@@ -256,21 +214,25 @@ class UsersController
             ], 401);
             return;
         }
-        
-        // account 일하는지 비겨
-        if($result->num_rows === 0){
-            echo json_response([
+
+        // DB접속
+        $db = get_db();
+        $repo = new UsersRepository($db);
+        $result = $repo->login($account, $role);
+
+        if ($result === null) {
+            json_response([
                 'success' => false,
-                'error' => ['code' => 'AUTHENTICATION_FAILED',
-                            'message' => 'ID가 일치하지 않습니다.']
+                'error'   => [
+                    'code'    => 'AUTHENTICATION_FAILED',
+                    'message' => 'ID가 일치하지 않습니다.'
+                ]
             ], 401);
             return;
         }
 
-        $row = $result->fetch_assoc();
-
         // 비밀번호 비겨
-        if (!password_verify($password , $row['password'])) {
+        if (!password_verify($password , $result['password'])) {
             echo json_response([
                 'success' => false,
                 'error' => ['code' => 'WRONG_PASSWORD',
@@ -281,20 +243,20 @@ class UsersController
 
         // 성공하면 SESSION에 저장
         $_SESSION['user'] = [
-            'user_id'   => (int)$row['user_id'],
-            'account'   => $row['account'],
-            'role'      => $row['role'],
-            'user_name' => $row['user_name']
+            'user_id'   => (int)$result['user_id'],
+            'account'   => $result['account'],
+            'role'      => $result['role'],
+            'user_name' => $result['user_name']
         ];
 
         json_response([
             'success' => true,
             'data' => [
                 'user' => [
-                    'user_id'   => (int)$row['user_id'],
-                    'account'   => $row['account'],
-                    'role'      => $row['role'],
-                    'user_name' => $row['user_name'],
+                    'user_id'   => (int)$result['user_id'],
+                    'account'   => $result['account'],
+                    'role'      => $result['role'],
+                    'user_name' => $result['user_name']
                 ]
             ]
         ]);

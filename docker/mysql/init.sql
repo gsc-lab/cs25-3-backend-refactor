@@ -180,8 +180,8 @@ CREATE TABLE IF NOT EXISTS Reservation (
     requirement TEXT,
     day DATE NOT NULL,
     start_at TIME NOT NULL,
-    end_at TIME ,
-    status ENUM('pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'no_show') NOT NULL DEFAULT 'pending',
+    end_at TIME NOT NULL,
+    status ENUM('confirmed', 'checked_in', 'completed', 'cancelled', 'no_show') NOT NULL DEFAULT 'pending',
     cancelled_at DATETIME,
     cancel_reason TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS Reservation (
         ON DELETE CASCADE,
     CONSTRAINT FK_reservation_designer 
         FOREIGN KEY (designer_id) REFERENCES Users(user_id)  
+        ON DELETE CASCADE
 );
 
 -- 예약 내목
