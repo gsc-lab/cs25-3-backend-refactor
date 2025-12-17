@@ -11,6 +11,17 @@
                         'action'     => 'index',
                         'middleware' => []
                     ]); 
+
+
+        // =================================
+        // Service정보 상세 보기 (누구나 ok)
+        // =================================
+        $router->map('GET',"/service/[a:service_id]",
+        [   'controller' =>  'ServiceController',
+            'action'     => 'show',
+            'middleware' => []
+        ]);
+
         
         // =================================
         // service 정보 작성 (login, manager)
@@ -39,11 +50,5 @@
                     'middleware' => ['login', 'manager']
                 ]);
 
-
-        $router->map('GET',"/service/[a:service_id]",
-                [   'controller' =>  'ServiceController',
-                    'action'     => 'show',
-                    'middleware' => []
-                ]);
     }
 ?>
