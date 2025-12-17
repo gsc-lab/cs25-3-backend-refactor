@@ -156,7 +156,7 @@ class ReservationController {
             while ($row = $result->fetch_assoc()) {
                 $rid = $row['reservation_id'];
 
-                // 予約データの初期化（最初の1回だけ）
+                // 예약 데이터의 초기화（멘 처음에 한 번 만）
                 if (!isset($reservations[$rid])) {
                     $reservations[$rid] = [
                         'reservation_id' => $rid,
@@ -169,7 +169,7 @@ class ReservationController {
                 }
             }
 
-            // JSON に出す形へ変換
+            // 연관 배열의 key를 제거하고 JSON 배열 형태로 맞춤
             $reservations = array_values($reservations);
 
             json_response([
