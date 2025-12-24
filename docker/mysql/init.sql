@@ -225,13 +225,12 @@ CREATE TABLE IF NOT EXISTS TimeOff (
     CONSTRAINT fk_timeoff_designer FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
 
--- event scheduler ON--
-SET GLOBAL event_scheduler = ON;
+DROP EVENT IF EXISTS delete_old_timeoff;
 
--- 과거의 스케즐 삭제 --
-CREATE EVENT IF NOT EXISTS delete_old_timeoff
+CREATE EVENT delete_old_timeoff
 ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
 DO
-  DELETE FROM TimeOff
-  WHERE end_at < CURDATE();
+    DELETE FROM TimeOff
+    WHERE end_at < CURDATE();
 
