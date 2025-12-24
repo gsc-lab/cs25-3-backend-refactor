@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Repository\TimeoffRepository;
+use App\Services\TimeOffService;
 use App\Errors\ErrorHandler;
 use Throwable;
 
@@ -18,8 +18,8 @@ class TimeoffController {
         
         try {
             $db = get_db(); // DB 연결
-            $repo = new TimeoffRepository($db);
-            $result = $repo->index();
+            $service = new TimeOffService($db);
+            $result = $service->indexService();
 
             // 성공 응답 반환
             json_response([
@@ -61,8 +61,8 @@ class TimeoffController {
         try {
             
             $db = get_db(); // DB 연결
-            $repo = new TimeoffRepository($db);
-            $repo->create($userId, $startAt, $endAt);
+            $service = new TimeoffService($db);
+            $service->createService($userId, $startAt, $endAt);
 
             // 성공 응답
             json_response([
@@ -95,8 +95,6 @@ class TimeoffController {
             ], 404);
             return;
         }
-
-        $toId = (int)$toId; // 형변환 확정
         
         // 프론트에서 데이터를 받는다
         $data = read_json_body();
@@ -115,13 +113,29 @@ class TimeoffController {
         }
 
         try {
-            // DB 접속
-            $db = get_db();
-            $repo = new TimeoffRepository($db);
-            $result = $repo->update($toId, $startAt, $endAt);
+
+            $db = get_db(); // DB 접속
+            $service = new TimeoffService($db);
+            
+            // 해당하는 to_id의 유무를 확인
+            $result = $service->showService($toId);
+
+            // 해당하는 to_id가 없으면 오류 처리
+            if ($result === 0) {
+                json_response([
+                    'success' => false,
+                    'error'   => [
+                        'code'    => 'TIMEOFF_NOT_FOUND',
+                        'message' => '해당 휴무 정보가 존재하지 않습니다.'
+                        ]
+                ], 400);
+            }
+
+            // 수정 
+            $update = $service->updateService($toId, $startAt, $endAt);
 
             // 수정된 행이 없다면 데이터 없음 처리
-            if ($result <= 0) {
+            if (!$update) {
                 json_response([                  
                      "success" => false,
                      "error"   => [
@@ -166,11 +180,27 @@ class TimeoffController {
         try {
 
             $db = get_db(); // DB 연결
-            $repo = new TimeoffRepository($db);
-            $result = $repo->delete($toId);
+            $service = new TimeoffService($db);
+
+            // 해당하는 to_id의 유무를 확인
+            $result = $service->showService($toId);
+
+            // 해당하는 to_id가 없으면 오류 처리
+            if ($result === 0) {
+                json_response([
+                    'success' => false,
+                    'error'   => [
+                        'code'    => 'TIMEOFF_NOT_FOUND',
+                        'message' => '해당 휴무 정보가 존재하지 않습니다.'
+                        ]
+                ], 400);
+            }
+
+            // 삭제 처리
+            $delete = $service->deleteService($toId);
 
             // 삭제된 행이 없으면 오류
-            if ($result <= 0){
+            if (!$delete){
                     json_response([
                         "success" => false,
                         "error"   => [
