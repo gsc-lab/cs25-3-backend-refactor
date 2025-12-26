@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Errors\ErrorHandler;
-use App\Repository\SalonRepository;
+use App\Services\SalonService;
 use App\Services\ImageService;
 use Throwable;
 
@@ -17,8 +17,8 @@ class SalonController {
 
         try {
             $db = get_db();
-            $repo = new SalonRepository($db);
-            $row = $repo->index();
+            $service = new SalonService($db);
+            $row = $service->indexService();
 
             json_response([
                 'success' => true,
@@ -63,9 +63,20 @@ class SalonController {
         }
  
             $db = get_db();
-            $repo = new SalonRepository($db);
-            $repo->updateTextOnly($intro, $info, $traffic);
+            $updateText = new SalonService($db);
+            $updateText->updateTextService($intro, $info, $traffic);
            
+            if (!$updateText) {
+                json_response([
+                    'success' => false,
+                    'error'   => [
+                        'code'    => 'UPDATE_FAILED',
+                        'message' => '수정에 실패했습니다.'
+                    ]
+                ], 500);
+                return;
+            }
+
             json_response([
                 'success' => true,
                 'message' => '수정 성공했습니다.'
@@ -114,22 +125,33 @@ class SalonController {
             }
 
             // 이미지를 업로드 하기 위해 ImageService를 호출하기
-            $imageServiceRepo = new ImageService();
+            $imageService = new ImageService();
             
             // upload함수 호출 (파일 정보 넘기기)
-            $uploadResult = $imageServiceRepo->upload($file, 'salon'); 
+            $uploadResult = $imageService->upload($file, 'salon'); 
             $newImageKey = $uploadResult['key']; // 새로운 image_key 받기
             $newImageUrl = $uploadResult['url']; // 새로운 image_url 받기
 
             $db = get_db();
-            $salonRepo = new SalonRepository($db);
-            $row = $salonRepo->index();
+            $imageUpdate = new SalonService($db);
+            $row = $imageUpdate->indexService();
 
             // 기존 이미지 삭제하기
-            $imageServiceRepo->delete($row['image_key']);
+            $imageService->delete($row['image_key']);
             
             // imageUpdate
-            $salonRepo->updateImage($newImageUrl, $newImageKey);
+            $imageUpdate->updateImageService($newImageUrl, $newImageKey);
+
+            if (!$imageUpdate) {
+                json_response([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'UPDATE_FAILED',
+                        'message' => '이미지 수정에 실패했습니다.'
+                    ]
+                ], 500);
+                return;
+            }
 
             json_response([
                 'success' => true,
