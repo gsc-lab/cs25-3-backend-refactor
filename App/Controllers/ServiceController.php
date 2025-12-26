@@ -2,7 +2,7 @@
     
 namespace App\Controllers;
 
-use App\Repository\ServiceRepository;
+use App\Services\ServiceService;
 use App\Errors\ErrorHandler;
 use Throwable;
 
@@ -21,13 +21,13 @@ class ServiceController{
             $db = get_db();
 
             // ServiceRepositry의 인스탄스를 생성
-            $repo = new ServiceRepository($db); // DB를 인자 값으로 보내기
-            $services = $repo->index();
+            $service = new ServiceService($db); // DB를 인자 값으로 보내기
+            $result = $service->indexService();
             
             // 프런트엔드에 리스터를 반환
             json_response([
                 "success" => true,
-                "data" => ['service' => $services] 
+                "data" => ['service' => $result] 
             ]);
 
         } catch (Throwable $e) {
@@ -47,10 +47,14 @@ class ServiceController{
         // 하나씩 꺼내기
         $serviceName = isset($data['service_name']) ? trim((string)$data['service_name']) : '';
         $price        = isset($data['price']) ? trim((string)$data['price']) : '';
-        $durationMin = isset($data['duration_min']) ? trim((int)$data['duration_min']) : '';
+        $durationMin = filter_var(
+            $data['duration_min'] ?? null, 
+            FILTER_VALIDATE_INT,
+        ['option' => ['min_range' => 1]]
+                );
 
         // 유호성 검사
-        if ($serviceName === '' || $price === '' || $durationMin === '') {
+        if ($serviceName === '' || $price === '' || $durationMin === false ) {
             json_response([
                 "success" => false,
                 "error"   => [
@@ -65,8 +69,9 @@ class ServiceController{
             // DB연결
             $db = get_db();
         
-            $repo = new ServiceRepository($db);
-            $repo->create($serviceName, $price, $durationMin);
+            $service = new ServiceService($db);
+            $service->createService(
+                $serviceName, $price, $durationMin);
 
             json_response([
                 'success' => true,
@@ -85,9 +90,12 @@ class ServiceController{
     public function update(string $serviceId) : void
     {
         // ID 정수 변환
-        $serviceId = filter_var($serviceId, FILTER_VALIDATE_INT);
+        $serviceId = filter_var($serviceId, 
+                                FILTER_VALIDATE_INT,
+                            ['options' => ['min_range' => 1]]
+                        );
 
-        if ($serviceId === false || $serviceId <= 0) {
+        if ($serviceId === false) {
             json_response([
                 "success" => false,
                 "error"   => [
@@ -103,10 +111,13 @@ class ServiceController{
 
         $serviceName = isset($data['service_name']) ? trim((string)$data['service_name']) : '';
         $price        = isset($data['price']) ? trim((string)$data['price']) : '';
-        $durationMin = isset($data['duration_min']) ? (int)$data['duration_min'] : 0;
+        $durationMin = filter_var($data['duration_min'],
+                                 FILTER_VALIDATE_INT,
+                                ['options' => ['min_range' => 1]]
+                            );
 
         // 유효성 검사
-        if ($serviceName === '' || $price === '' || $durationMin <= 0) {
+        if ($serviceName === '' || $price === '' || $durationMin === false) {
             json_response([
                 "success" => false,
                 "error"   => [
@@ -120,11 +131,11 @@ class ServiceController{
         try {
             $db = get_db();
 
-            $repo = new ServiceRepository($db);
-            $services = $repo->update($serviceId, $serviceName,
+            $service = new ServiceService($db);
+            $update = $service->updateService($serviceId, $serviceName,
                                             $price, $durationMin);
 
-            if ($services <= 0) {
+            if (!$update) {
                 // 없는 ID이거나 값이 완전히 동일한 경우
                 json_response([
                     "success" => false,
@@ -152,9 +163,12 @@ class ServiceController{
     public function delete(string $sereviceId):void{
 
         // service_id검중
-        $serviceId = filter_var($sereviceId, FILTER_VALIDATE_INT);
+        $serviceId = filter_var($sereviceId, 
+                                FILTER_VALIDATE_INT,
+                            ['options' => ['min_range' => 1]]
+                        );
 
-        if ($serviceId === false || $serviceId <= 0) {
+        if ($serviceId === false) {
             json_response([
                 "success" => false,
                 "error"   => [
@@ -170,10 +184,10 @@ class ServiceController{
             // DB접속
             $db = get_db();
             
-            $repo = new ServiceRepository($db);
-            $delete = $repo->delete($sereviceId);
+            $service = new ServiceService($db);
+            $delete = $service->deleteService($sereviceId);
 
-            if ($delete <= 0){
+            if (!$delete){
                 json_response([
                     "success" => false,
                     "error"   => [
@@ -189,6 +203,8 @@ class ServiceController{
                 "success" => true,
             ], 204);   
 
+        } catch (ResourceNotFoundException $e) {
+
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[service_delete]'), 500);
         }
@@ -200,8 +216,8 @@ class ServiceController{
         try{
             // DB접속
             $db = get_db();
-            $repo = new ServiceRepository($db);
-            $row = $repo->show($serviceId);
+            $service = new ServiceService($db);
+            $row = $service->showService($serviceId);
             
             // 프런트엔드에 리스터를 반환
             json_response([
