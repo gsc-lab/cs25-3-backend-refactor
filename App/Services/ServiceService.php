@@ -107,10 +107,7 @@ class ServiceService {
 
         $result = $this->repo->show($serviceId);
 
-        if ($result === null) {
-            throw new ResourceNotFoundException();
-        }
-        return $this->repo->show($serviceId);
+        return $result;
 
     }
 
