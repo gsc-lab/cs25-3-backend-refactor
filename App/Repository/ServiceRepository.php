@@ -85,19 +85,21 @@ class ServiceRepository{
     }
 
 
-    // =====================================
-    // 특정 service_id의 Service 정보 조회
-    // =====================================
+    /**
+     * 특정 service_id의 Service 정보 조회
+     * @param int $serviceId 시술의 ID
+     * @return array|bool|null falsy：false, 0, "0", "", null, [] 의 경우 null를 반환
+     */
     public function show(
         int $serviceId
-    ):array{
+    ):?array{
 
         $stmt = $this->db->prepare("SELECT * FROM Service WHERE service_id=?");
         $stmt->bind_param('i', $serviceId);
         $stmt->execute(); 
-        $result = $stmt->get_result(); 
+        $result = $stmt->get_result()->fetch_assoc(); 
         
         // fetch_assoc() → 단일 레코드 반환
-        return $result->fetch_assoc();
+        return $result ?: null;
     }
 }
