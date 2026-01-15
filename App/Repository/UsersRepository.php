@@ -126,8 +126,7 @@ class UsersRepository {
     // 로그인 (SELECT)
     // ===========================
     // account + role 로 사용자 조회
-    // 존재하지 않으면 401 에러 반환
-    // 존재하면 해당 사용자 정보를 배열로 반환 
+    // 존재하지않음 -> null , 존재함 -> 배열 반환 
     public function login(
         string $account,
         string $role
@@ -141,12 +140,7 @@ class UsersRepository {
         $stmt->execute();
         $result = $stmt->get_result();
 
-        // 처리 종류 , null를 반환
-        if ($result->num_rows === 0) {
-            return null;
-        }
-
-        return $result->fetch_assoc();
+        return $result->fetch_assoc() ?: null;
     }
 
 }
