@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers;
 
-use App\Repository\HairstyleRepository;
+use App\Services\HairstyleService;
 use App\Errors\ErrorHandler;
 use Throwable;
 use App\Services\ImageService; // R2 업로드/삭제용 서비스
@@ -44,8 +44,8 @@ class HairstyleController
             }
 
             $db = get_db();
-            $repo = new HairstyleRepository($db);
-            $hairstyle = $repo->index($limit);
+            $repo = new HairstyleService($db);
+            $hairstyle = $repo->listHairstyles($limit);
             
             json_response([
                 'success' => true,
@@ -79,10 +79,10 @@ class HairstyleController
 
         try {
             $db = get_db();
-            $repo = new HairstyleRepository($db);
+            $repo = new HairstyleService($db);
 
             // 대상 데이터 조회
-            $row = $repo->show($hairId);
+            $row = $repo->getHairstyle($hairId);
 
             // 존재하지 않는 경우
             if (!$row) {
@@ -167,8 +167,8 @@ class HairstyleController
 
             // 3) DB INSERT (image: URL, image_key: R2 object key)
             $db = get_db();
-            $repo = new HairstyleRepository($db);
-            $repo->create($title, $imageUrl, $imageKey, $description);
+            $repo = new HairstyleService($db);
+            $repo->createHairstyle($title, $imageUrl, $imageKey, $description);
           
             json_response([
                 'success' => true,
@@ -228,13 +228,13 @@ class HairstyleController
             $description = isset($data['description']) ? (string)$data['description'] : '';
  
             $db = get_db();
-            $repo = new HairstyleRepository($db);
+            $repo = new HairstyleService($db);
 
             // DB 업데이트
-            $repo->updateTextOnly($hairId, $title, $description);
+            $repo->updateHairstyleText($hairId, $title, $description);
 
             // 새로 갱신된 데이터 조회 후 반환
-            $row = $repo->show($hairId);
+            $row = $repo->getHairstyle($hairId);
 
             json_response([
                 'success' => true,
@@ -280,10 +280,10 @@ class HairstyleController
 
         try {
             $db = get_db();
-            $repo = new HairstyleRepository($db);
+            $repo = new HairstyleService($db);
 
             // 기존 데이터 조회
-            $current = $repo->show($hairId);
+            $current = $repo->getHairstyle($hairId);
 
             if (!$current) {
                 json_response([
@@ -327,10 +327,10 @@ class HairstyleController
             }
 
             // 3) DB 업데이트
-            $repo->updateImageOnly($hairId, $newUrl, $newKey);
+            $repo->updateHairstyleImage($hairId, $newUrl, $newKey);
 
             // 변경된 내용 재조회 후 반환
-            $row = $repo->show($hairId);
+            $row = $repo->getHairstyle($hairId);
 
             json_response([
                 'success' => true,
@@ -363,10 +363,10 @@ class HairstyleController
 
         try {
             $db = get_db();
-            $repo = new HairstyleRepository($db);
+            $repo = new HairstyleService($db);
 
             // 삭제 대상 존재 여부 확인
-            $row = $repo->show($hairId);
+            $row = $repo->getHairstyle($hairId);
 
             if (!$row) {
                 json_response([
@@ -394,7 +394,7 @@ class HairstyleController
             }
 
             // 2) DB 삭제
-            $result = $repo->delete($hairId);
+            $result = $repo->deleteHairstyle($hairId);
             
             if ($result === 0) {
                 json_response([
