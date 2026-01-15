@@ -103,11 +103,11 @@ class ServiceService {
      */
     public function showService(
         int $serviceId
-    ): array {
+    ): ?array {
 
         $result = $this->repo->show($serviceId);
 
-        return $result;
+        return $result?:null;
 
     }
 
