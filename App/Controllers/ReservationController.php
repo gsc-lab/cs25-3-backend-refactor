@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Repository\ReservationRepository;
+use App\Services\ReservationService;
 use App\Errors\ErrorHandler;
 use DateTime;
 use Throwable;
@@ -40,28 +40,12 @@ class ReservationController {
 
             $today  = date('Y-m-d');
 
+            // 과거의 예약인지 아니면 미래의 예약인지 카리키는 표시 
             $time = $_GET['time'] ?? null;
 
-            // time = -1 → 과거 예약
-            // time ≠ -1 → 미래 예약
-            if ((int)$time === -1) {
-                $condition = " r.day < ?";
-            } else {
-                $condition = " r.day >= ?";
-            }
-
-            // designer의 경우
-            if ($role === 'designer') {
-                $where = " WHERE r.designer_id = ?";
-            } 
-            // client의 경우 
-            elseif ($role === 'client') {
-                $where = " WHERE r.client_id = ?";
-            }
-
             // Repository 호출하여 JOIN된 예약 + 서비스 목록 조회
-            $repo = new ReservationRepository($db);
-            $result = $repo->show($userId, $where, $condition, $today);
+            $service = new ReservationService($db);
+            $result = $service->getMyReservations($userId, $role, $time, $today);
             
             // 하나의 예약(reservation_id)에 여러 서비스가 연결되므로
             // reservation_id 기준으로 데이터를 그룹핑해서 JSON 출력 형태 조정
@@ -115,42 +99,16 @@ class ReservationController {
     // =======================================================
     public function designerDetail():void{
 
-        $user_id = isset($_GET['designer_id']) ? $_GET['designer_id'] : '';
+        $designerId = isset($_GET['designer_id']) ? $_GET['designer_id'] : '';
         $today = date('Y-m-d');
 
-        $time = isset($_GET['time']) ? trim($_GET['time']) : '';
         try {
 
             $db = get_db();
 
-            // where 조건
-            $where = " WHERE r.designer_id = ?";
-            
-            // day
-            $day = " r.day >= ? ";
+            $service = new ReservationService($db);
+            $result = $service->getDesignerUpcomingReservations($designerId, $today);
 
-            $stmt = $db->prepare("SELECT 
-                                        r.reservation_id,
-                                        ud.user_name as designer_name,
-                                        r.day,
-                                        r.start_at,
-                                        r.end_at,
-                                        r.status
-                                        FROM Reservation AS r
-                                        JOIN Users AS ud -- designer
-                                            ON r.designer_id = ud.user_id
-                                        JOIN Users AS uc -- client
-                                            ON r.client_id = uc.user_id
-                                        JOIN ReservationService AS rs
-                                            ON r.reservation_id = rs.reservation_id
-                                        JOIN Service AS s
-                                            ON rs.service_id = s.service_id
-                                        $where AND $day
-                                        ORDER BY r.day, start_at");
-            $stmt->bind_param('is', $user_id, $today);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
             $reservations = [];
                                             
             while ($row = $result->fetch_assoc()) {
@@ -190,9 +148,6 @@ class ReservationController {
         }
     }
 
-
-
-
     
     // ===================================================================
     // 'POST' => 예약 작성
@@ -230,10 +185,10 @@ class ReservationController {
         
         try {
             $db = get_db();
-            $repo = new ReservationRepository($db);
+            $service = new ReservationService($db);
             
             // 서비스 총 소요 시간 계산
-            $totalMin = $repo->totalMin($serviceId);
+            $totalMin = $service->calculateTotalDuration($serviceId);
 
             // start_at + totalMin → end_at 계산
             $start = new DateTime($startAt);
@@ -242,14 +197,14 @@ class ReservationController {
             $endAt = $end->format("H:i");
 
             // designer 휴무과 여약시간 중복 여부를 확인
-            $checkTimeoff = $repo->checkTimeoff($designerId, $day);
+            $checkTimeoff = $service->checkDesignerTimeOff($designerId, $day);
 
             // 같은 디자이너의 동일 날짜/시간대 예약과 충돌 여부 검사
-            $reservationTimeCheck = $repo->reservationTimeCheck(
+            $reservationTimeCheck = $service->checkReservationTimeConflict(
                 $designerId, $day, $endAt, $startAt);
             
             // 어느 쪽 하나라도 중복이 되면 오류 표시
-            if ($checkTimeoff === 1 || $reservationTimeCheck === 1) {
+            if (!$checkTimeoff || !$reservationTimeCheck ) {
                 json_response([
                     'success' => false,
                     'error'   => [
@@ -261,7 +216,7 @@ class ReservationController {
             }
 
             // 중복이 없으면 예약내용을 INSERT하기
-            $repo->create($userId, $designerId, $requirement,
+            $service->createReservation($userId, $designerId, $requirement,
              $day, $startAt, $endAt, $serviceIds);
             
             json_response([
@@ -302,7 +257,7 @@ class ReservationController {
         try {
 
             $db = get_db();
-            $repo = new ReservationRepository($db);
+            $service = new ReservationService($db);
 
             // client 예약 취소
             if ($role === 'client') {
@@ -322,7 +277,7 @@ class ReservationController {
                 }
 
                 // reservation_id로 예약내용을 Update하기 (cancel_reason, status,cancelled_at) 
-                $clientCancel = $repo->clientCancel($cancelReason, $reservationId);
+                $clientCancel = $service->cancelReservationByClient($cancelReason, $reservationId);
                 
                 if ($clientCancel === 0) {
                     json_response([
@@ -352,7 +307,7 @@ class ReservationController {
                     return;
                 }
 
-                $statusChenge = $repo->statusChenge($status, $reservationId);
+                $statusChenge = $service->changeReservationStatus($status, $reservationId);
                 
                 if ($statusChenge === 0) {
                     json_response([
