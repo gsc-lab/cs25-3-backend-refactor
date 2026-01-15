@@ -203,8 +203,6 @@ class ServiceController{
                 "success" => true,
             ], 204);   
 
-        } catch (ResourceNotFoundException $e) {
-
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[service_delete]'), 500);
         }
@@ -218,6 +216,12 @@ class ServiceController{
             $db = get_db();
             $service = new ServiceService($db);
             $row = $service->showService($serviceId);
+
+            // 데이터가 존재하지 않으면 오류 표시
+            if ($row === null){
+                json_response(ErrorHandler::notResouce(), 404);
+                return;
+            }
             
             // 프런트엔드에 리스터를 반환
             json_response([
