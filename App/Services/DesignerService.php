@@ -38,16 +38,15 @@ class DesignerService {
      */
     public function getDesigner(
         int $designerId
-        ):array {
+    ):?array {
 
-            return $this->repo->show($designerId);
-        
-        }
+        return $this->repo->show($designerId) ?: null;
+    }
 
     
     /**
      * Designer정보 작성
-     * @param int $userId         PRYMARY KEY
+     * @param int $userId         PRIMARY 
      * @param string $imageUrl    이미지의 URL
      * @param string $imageKey    이미지의 이름
      * @param int $experience     결력
@@ -61,13 +60,13 @@ class DesignerService {
         string $imageUrl,
         string $imageKey,
         int    $experience, 
-        string $good_at,
+        string $goodAt,
         string $personality,
         string $message
     ): bool {
 
         $result = $this->repo->create($userId, $imageUrl, $imageKey, $experience,
-                            $good_at, $personality, $message);
+                            $goodAt, $personality, $message);
         return $result;
     }
 
@@ -75,9 +74,9 @@ class DesignerService {
     /**
      * 텍스트 정보만 수정
      * @param int $designerId     designer의 userID
-     * @param int $experience     결력
+     * @param int $experience     경력
      * @param string $good_at     잘하는 기술
-     * @param string $personality 분의기
+     * @param string $personality 분위기
      * @param string $message     메시지
      * @return bool
      */
@@ -108,11 +107,11 @@ class DesignerService {
         int $designerId,
         string $imageUrl,
         string $imageKey
-        ): bool {
+    ): bool {
 
-            $result = $this->repo->updateImageOnly($designerId, $imageUrl, $imageKey);
+        $result = $this->repo->updateImageOnly($designerId, $imageUrl, $imageKey);
 
-            return $result;
+        return $result;
     }
 
 
@@ -123,9 +122,9 @@ class DesignerService {
      */
     public function getDesignerImageKey(
         int $designerId
-        ): ?string {
+    ): ?string {
     
-            return $result = $this->repo->findFileKey($designerId);
+        return $this->repo->findFileKey($designerId);
     }
 
 
