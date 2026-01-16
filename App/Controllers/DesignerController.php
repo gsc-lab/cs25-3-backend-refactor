@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Repository\DesignerRepository;
+use App\Services\DesignerService;
 use App\Errors\ErrorHandler;
 use App\Services\ImageService;
 use RuntimeException;
@@ -33,13 +33,13 @@ class DesignerController{
         try {
             // DB접속
             $db = get_db();
-            $repo = new DesignerRepository($db);
-            $designers = $repo->index();
+            $repo = new DesignerService($db);
+            $designers = $repo->listDesigners();
 
             // 프론트에 반환
             json_response([
                 'success' => true,
-                'data' => ['designer' => $designers]
+                'data'    => ['designer' => $designers]
             ]);
         
         // 예외 처리 (서버내 오류 발생지)
@@ -61,7 +61,7 @@ class DesignerController{
             json_response([
                 'success' => false,
                 'error'   => [
-                    'code' => 'INVALID_ID',
+                    'code'    => 'INVALID_ID',
                     'message' => 'ID가 잘못되었습니다. 올바른 숫자 ID를 지정하십시오.'
                 ]
             ], 400);
@@ -70,16 +70,17 @@ class DesignerController{
 
         try{
             $db = get_db(); // DB접속
-            $repo = new DesignerRepository($db);
-            $row = $repo->show($designerId);
+            $repo = new DesignerService($db);
+            $row = $repo->getDesigner($designerId);
  
             // 결과가 없는 경우 오류  
             if (!$row) {
                 json_response([
                     'success' => false,
-                    'error' =>['code' => 'RESOURCE_NOT_FOUND',
-                                'message' => '해당 디자이너를 찾을 수 없습니다.'
-                            ]
+                    'error'   =>[
+                        'code'    => 'RESOURCE_NOT_FOUND',
+                        'message' => '해당 디자이너를 찾을 수 없습니다.'
+                        ]
                 ], 404);
                 return;
             }
@@ -87,7 +88,7 @@ class DesignerController{
             // JSON 응답
             json_response([
                 'success' => true,
-                'data' => ['designer' => $row]
+                'data'    => ['designer' => $row]
             ]);
 
         // 예외 처리 (서버내 오류 발생지)
@@ -158,8 +159,8 @@ class DesignerController{
             $imageUrl     = $uploadResult['url'];
 
             $db = get_db(); // DB접속
-            $repo = new DesignerRepository($db);
-            $result = $repo->create($userId, $imageUrl, $imageKey, $experience,
+            $repo = new DesignerService($db);
+            $result = $repo->createDesigner($userId, $imageUrl, $imageKey, $experience,
                                      $goodAt, $personality, $message);
     
             if (!$result) {
@@ -255,8 +256,8 @@ class DesignerController{
             }
 
             $db = get_db();
-            $repo = new DesignerRepository($db);
-            $repo->updateTextOnly($designerId, $experience, 
+            $repo = new DesignerService($db);
+            $repo->updateDesignerProfile($designerId, $experience, 
                                         $goodAt,$personality, $message); 
 
             // 성공 200 코드
@@ -307,8 +308,8 @@ class DesignerController{
         try {
 
             $db = get_db();
-            $repo = new DesignerRepository($db);
-            $current = $repo->show($designerId);
+            $repo = new DesignerService($db);
+            $current = $repo->getDesigner($designerId);
 
             if (!$current) {
                 json_response([
@@ -352,7 +353,7 @@ class DesignerController{
             }
 
             // DB 수정
-            $repo->updateImageOnly($designerId, $newUrl, $newKey);
+            $repo->updateDesignerImage($designerId, $newUrl, $newKey);
             
             // 성공 200 코드
             json_response([
@@ -388,9 +389,9 @@ class DesignerController{
         try {
             
             $db = get_db(); // DB접속
-            $repo = new DesignerRepository($db);
+            $repo = new DesignerService($db);
             // 0) 먼저 image_key 조회
-            $row = $repo->show($designerId);
+            $row = $repo->getDesigner($designerId);
             if (!$row['image_key']) {
                 json_response([
                     'success' => false,
@@ -417,7 +418,7 @@ class DesignerController{
             }
 
             // 2) DB 삭제
-            $delete = $repo->delete($designerId);
+            $delete = $repo->deleteDesigner($designerId);
 
             // 삭제된 행이 없는 경우 오류 표시
             if ($delete === 0){
