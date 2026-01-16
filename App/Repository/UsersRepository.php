@@ -92,7 +92,7 @@ class UsersRepository {
         string $password_hash,
         string $user_name,
         string $phone
-    ):int {
+    ):bool {
 
         $stmt = $this->db->prepare("UPDATE Users SET 
                                 account = ?, password = ?, user_name = ?, phone = ?
@@ -102,7 +102,7 @@ class UsersRepository {
         $stmt->execute();
 
         // 변경된 행 수 반환
-        return $stmt->affected_rows;
+        return $stmt->affected_rows > 0;
     }
 
 
