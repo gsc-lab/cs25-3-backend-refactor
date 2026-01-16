@@ -96,14 +96,10 @@ class UsersService {
         string $passwordHash,
         string $userName,
         string $phone
-    ):int {
-
+    ):bool {
         
         $result = $this->repo->update($userId, $account, 
                                 $passwordHash, $userName, $phone);
-        if ($result === 1) {
-            throw new NoChangesException('수정된 내용이 없습니다.');
-        }
 
         return $result;
     }
