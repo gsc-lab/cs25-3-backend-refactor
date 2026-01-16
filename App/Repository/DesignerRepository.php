@@ -47,7 +47,7 @@ class DesignerRepository {
     // =============================== 
     public function show(
         int $designerId
-    ):array {
+    ):?array {
 
         $stmt = $this->db->prepare("SELECT
                                 d.designer_id,
@@ -67,7 +67,7 @@ class DesignerRepository {
         $stmt->execute();
         
         // 행 하나만 반환
-        return $stmt->get_result()->fetch_assoc();
+        return $stmt->get_result()->fetch_assoc() ?: null;
     }
 
 
