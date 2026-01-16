@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Repository\NewsRepository;
+use App\Services\NewsService;
 use App\Errors\ErrorHandler;
 use App\Services\ImageService;
 use RuntimeException;
@@ -78,8 +78,8 @@ class NewsController {
             }
             
             $db = get_db(); // DB 접속
-            $repo = new NewsRepository($db); // Repository 호출
-            $repo->create($params, $colum, $values, $types);
+            $service = new NewsService($db); // Repository 호출
+            $service->createNews($params, $colum, $values, $types);
 
             // 프론트엔드에 반환하는 값
             json_response([
@@ -117,8 +117,8 @@ class NewsController {
             }
 
             $db = get_db(); 
-            $repo = new NewsRepository($db);
-            $news = $repo->index($limit);
+            $service = new NewsService($db);
+            $news = $service->getAllNews($limit);
 
             json_response([
                 "success" => true,
@@ -153,8 +153,8 @@ class NewsController {
         try {
 
             $db = get_db(); 
-            $repo = new NewsRepository($db);
-            $row = $repo->show($newsId);
+            $service = new NewsService($db);
+            $row = $service->getNewsById($newsId);
 
             // 요청한 news글을 찾을 수 없었을 때
             if (!$row) {
@@ -238,11 +238,11 @@ class NewsController {
 
             // DB 접속
             $db = get_db();
-            $repo = new NewsRepository($db);
-            $repo->updateTextOnly($newsId, $title, $content);
+            $service = new NewsService($db);
+            $service->updateNewsContent($newsId, $title, $content);
             
             // update한 글을 찾아 오기
-            $row = $repo->show($newsId);
+            $row = $service->getNewsById($newsId);
             if (!$row) {
                 json_response([
                     "success" => false,
@@ -304,8 +304,8 @@ class NewsController {
             $db = get_db(); // DB 연결
 
             // 해당 글이 실제 DB에 존재하는지 조회
-            $newsRepo = new NewsRepository($db);
-            $current = $newsRepo->show($newsId);
+            $newsRepo = new NewsService($db);
+            $current = $newsRepo->getNewsById($newsId);
 
             // DB에 해당 글이 없을 경우 404 반환
             if (!$current) {
@@ -351,7 +351,7 @@ class NewsController {
             }
 
             // DB에 새로운 이미지 정보 업데이트
-            $newsRepo->updateImageOnly($newsId, $newUrl, $newKey);
+            $newsRepo->updateNewsImage($newsId, $newUrl, $newKey);
 
             json_response([
                 'success' => true,
@@ -388,8 +388,8 @@ class NewsController {
             // $db접속
             $db = get_db();
             // 삭제 전에 파일 키(file_key)를 조회
-            $repo = new NewsRepository($db);
-            $fileKey = $repo->findFileKey($newsId);
+            $service = new NewsService($db);
+            $fileKey = $service->getNewsImageKey($newsId);
             
             // 이미지 파일이 있을 경우 삭제 시도
             if ($fileKey) {
@@ -402,7 +402,7 @@ class NewsController {
             }
 
             // news 테이블에서 해당 글을 삭제 하기
-            $delete = $repo->delete($newsId);
+            $delete = $service->deleteNews($newsId);
             
             // DELETE SQL문의 영향을 받는 행이 없으면 삭제할 데이터 없음
             if ($delete === 0) {
