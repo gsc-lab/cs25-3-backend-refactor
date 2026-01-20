@@ -142,14 +142,12 @@ class UsersController {
             return;
         }
 
-        $passwordHash = password_hash($passwordRaw, PASSWORD_DEFAULT);
-
         try {
             // DB접속
             $db   = get_db();
             $service = new UsersService($db);
             $service->updateService($userId, $account, 
-                $passwordHash, $userName, $phone);
+                $passwordRaw, $userName, $phone);
 
             json_response([
                 'success' => true,
