@@ -203,6 +203,8 @@ class ServiceController{
                 "success" => true,
             ], 204);   
 
+        } catch (ResourceNotFoundException $e) {
+
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e, '[service_delete]'), 500);
         }
