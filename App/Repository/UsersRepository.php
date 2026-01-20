@@ -92,7 +92,7 @@ class UsersRepository {
         string $password_hash,
         string $user_name,
         string $phone
-    ):bool {
+    ):int {
 
         $stmt = $this->db->prepare("UPDATE Users SET 
                                 account = ?, password = ?, user_name = ?, phone = ?
@@ -102,7 +102,7 @@ class UsersRepository {
         $stmt->execute();
 
         // 변경된 행 수 반환
-        return $stmt->affected_rows > 0;
+        return $stmt->affected_rows;
     }
 
 
@@ -141,6 +141,25 @@ class UsersRepository {
         $result = $stmt->get_result();
 
         return $result->fetch_assoc() ?: null;
+    }
+
+
+    /**
+     * 현재 password chack
+     * @param string $account accountID
+     * @return string         등록된 password 반환 
+     */
+    public function currentPasswordChack(
+        string $account
+    ): string {
+
+        $stmt = $this->db->prepare("SELECT password FROM Users WHERE account=?");
+        $stmt->bind_param('s', $account);
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+
+        return $result["password"];
+
     }
 
 }
