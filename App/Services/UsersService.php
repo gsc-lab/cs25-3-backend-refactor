@@ -93,15 +93,23 @@ class UsersService {
     public function updateService(
         int $userId,
         string $account,
-        string $passwordHash,
+        string $passwordRaw,
         string $userName,
         string $phone
-    ):int {
+    ):bool {
 
+        // 현재 password를 가져오기
+        $crrentPassword = $this->repo->currentPasswordChack($account);
+        if (password_verify($passwordRaw, $crrentPassword)) {
+            throw new NoChangesException('수정된 내용이 없습니다.');   
+        }
         
+        $passwordHash = password_hash($passwordRaw, PASSWORD_DEFAULT);
+
         $result = $this->repo->update($userId, $account, 
                                 $passwordHash, $userName, $phone);
-        if ($result === 1) {
+
+        if ($result === 0) {
             throw new NoChangesException('수정된 내용이 없습니다.');
         }
 

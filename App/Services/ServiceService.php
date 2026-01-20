@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Repository\ServiceRepository;
+use App\Exceptions\NoChangesException;
 use mysqli;
+use RuntimeException;
 use Throwable;
 
 class ServiceService {
@@ -68,14 +70,19 @@ class ServiceService {
         int $duration
     ): bool {
 
-        $affectedRows = $this->repo->update(
-            $sereviceId,
-            $serviceName,
-            $price,
-            $duration
-        );
+        $affectedRows = $this->repo->update($sereviceId, $serviceName,
+                        $price, $duration );
 
-        return $affectedRows > 0;
+
+        if ($affectedRows === 1) {
+            return true;
+        }
+
+        if ($affectedRows === 0){
+            throw new NoChangesException('수정된 내용이 없습니다.');
+        }
+
+        throw new RuntimeException('DB update failed');
  
     }
 
@@ -103,11 +110,11 @@ class ServiceService {
      */
     public function showService(
         int $serviceId
-    ): array {
+    ): ?array {
 
         $result = $this->repo->show($serviceId);
 
-        return $result;
+        return $result?:null;
 
     }
 

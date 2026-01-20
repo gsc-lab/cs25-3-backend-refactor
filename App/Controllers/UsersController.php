@@ -2,8 +2,9 @@
 
 namespace App\Controllers;
 
-use App\Repository\UsersRepository;
+use App\Services\UsersService;
 use App\Errors\ErrorHandler;
+use App\Exceptions\NoChangesException;
 use Throwable;
 
 // DB 로딩
@@ -19,26 +20,28 @@ class UsersController {
     // ======================
     public function show() :void {
         
-        $user_id = $_SESSION['user']['user_id'];
+        $userId = $_SESSION['user']['user_id'];
 
         try {
             // DB접속
             $db = get_db();
-            $repo = new UsersRepository($db);
-            $result = $repo->show($user_id);
+            $service = new UsersService($db);
+            $result = $service->showService($userId);
             
             if($result === null){ 
                 json_response([
                     'success' => false,
-                    'error' => ['code' => 'USER_NOT_FOUND', 
-                                'message' => '해당 회원을 찾을 수 없습니다.']
+                    'error'   => [
+                        'code'    => 'USER_NOT_FOUND', 
+                        'message' => '해당 회원을 찾을 수 없습니다.'
+                        ]
                 ], 404);
                 return;
             }
             
             json_response([
                 'success' => true,
-                'data' => ['user' => $result]
+                'data'    => ['user' => $result]
             ]);
         
             // 오류시 
@@ -57,44 +60,48 @@ class UsersController {
 
             // 입력 값 꺼내기
             $account      = isset($data['account']) ? trim((string)($data['account'])) : '';
-            $password_raw = isset($data['password']) ? trim((string)($data['password'])) : '' ;
-            $user_name    = isset($data['user_name']) ? trim((string)($data['user_name'])) : '';
+            $passwordRaw = isset($data['password']) ? trim((string)($data['password'])) : '' ;
+            $userName    = isset($data['user_name']) ? trim((string)($data['user_name'])) : '';
             $role         = isset($data['role']) ? trim((string)($data['role'])) : '';
             $gender       = isset($data['gender']) ? trim((string)($data['gender'])) : '';
             $phone        = isset($data['phone']) ? trim((string)($data['phone'])) : '';
             $birth        = isset($data['birth']) ? trim((string)($data['birth'])) : '';
 
             // 유호성 확인
-            if ($account === '' || $password_raw === '' || $user_name === '' ||
+            if ($account === '' || $passwordRaw === '' || $userName === '' ||
                 $role === '' || $gender === '' || $birth === '') {
                 // 유호하지 않으면 json_responce 반환
-                echo json_response([
-                    'success' => false,
-                    'error' => ['code' => 'VALIDATION_ERROR',
-                                'message' => '필수 필드가 비었습니다.']
+                    json_response([
+                        'success' => false,
+                        'error'   => [
+                            'code'    => 'VALIDATION_ERROR',
+                            'message' => '필수 필드가 비었습니다.'
+                            ]
                 ], 400);
                 return;
             }
 
             // DB접속
             $db = get_db();
-            $repo = new UsersRepository($db);
-            $result = $repo->accountCheck($account);
+            $service = new UsersService($db);
+            $result = $service->accountChackService($account);
 
             // 중복된 account 여부를 확인
             if ($result){
-                echo json_response([
+                json_response([
                     'success' => false,
-                    'error' => ['code' => 'ACCOUNT_DUPLICATED',
-                                'message' => '중복된 ID입니다.']
+                    'error'   => [
+                        'code'    => 'ACCOUNT_DUPLICATED',
+                        'message' => '중복된 ID입니다.'
+                        ]
                 ], 409);
                 return;
             }
             
             // 없으면 password hash처리해 저장
-            $password_hash = password_hash($password_raw, PASSWORD_DEFAULT);
-            $repo->create($account, $password_hash, 
-                                    $user_name, $role, $gender, $phone, $birth);
+            $passwordHash = password_hash($passwordRaw, PASSWORD_DEFAULT);
+            $service->createService($account, $passwordHash, 
+                                    $userName, $role, $gender, $phone, $birth);
         
             json_response([
                 'success' => true
@@ -112,49 +119,50 @@ class UsersController {
     // ======================
     public function update() :void {
 
-        $user_id = $_SESSION['user']['user_id'];
+        $userId = $_SESSION['user']['user_id'];
 
         // Reqest버디(JSON)를 배열으로 받는다
         $data = read_json_body();
 
         $account      = isset($data['account']) ? trim((string)($data['account'])) : '';
-        $password_raw = isset($data['password']) ? trim((string)($data['password'])) : '' ;
-        $user_name    = isset($data['user_name']) ? trim((string)($data['user_name'])) : '';
+        $passwordRaw = isset($data['password']) ? trim((string)($data['password'])) : '' ;
+        $userName    = isset($data['user_name']) ? trim((string)($data['user_name'])) : '';
         $phone        = isset($data['phone']) ? trim((string)($data['phone'])) : '';
         
         // 유호성 확인
-        if ($account === '' || $password_raw === '' || $user_name === '') {
+        if ($account === '' || $passwordRaw === '' || $userName === '') {
             // 유호하지 않으면 json_responce 반환
-            echo json_response([
+            json_response([
                 'success' => false,
-                'error' => ['code' => 'VALIDATION_ERROR',
-                            'message' => '필수 필드가 비었습니다.']
+                'error'   => [
+                    'code'    => 'VALIDATION_ERROR',
+                    'message' => '필수 필드가 비었습니다.'
+                    ]
             ], 400);
             return;
         }
 
-        $password_hash = password_hash($password_raw, PASSWORD_DEFAULT);
-
         try {
             // DB접속
             $db   = get_db();
-            $repo = new UsersRepository($db);
-            $result = $repo->update($user_id, $account, 
-                $password_hash, $user_name, $phone);
-
-            if ($result === 0){
-                json_response([
-                    "success" => false,
-                    "error" => ['code' => 'NO_CHANGES_APPLIED',
-                                'message' => '수정된 내용이 없습니다.']
-                ], 409);
-                return;
-            }
+            $service = new UsersService($db);
+            $service->updateService($userId, $account, 
+                $passwordRaw, $userName, $phone);
 
             json_response([
                 'success' => true,
                 'message' => '수정 성공했습니다.'
             ]);
+
+        } catch(NoChangesException $e){
+            json_response([
+                    'success' => false,
+                    'error'   => [
+                        'code'    => 'NO_CHANGES_APPLIED',
+                        'message' => $e->getMessage()
+                    ]
+                ], 409);
+            return;
 
         } catch (Throwable $e) {
             json_response(ErrorHandler::server($e,'[users_update]'), 500);
@@ -166,13 +174,13 @@ class UsersController {
     // =================
     public function delete() :void {
 
-        $user_id = $_SESSION['user']['user_id'];
+        $userId = $_SESSION['user']['user_id'];
 
         try{
             // db 접속
             $db = get_db();
-            $repo = new UsersRepository($db);
-            $result = $repo->delete($user_id);
+            $service = new UsersService($db);
+            $result = $service->deleteService($userId);
 
             if ($result <= 0) {
                 json_response([
@@ -207,18 +215,20 @@ class UsersController {
         
         // 필수 필드가 비었습니다.
         if ($account === '' || $password === '' || $role === '') {
-            echo json_response([
+            json_response([
                 'success' => false,
-                'error' => ['code' => 'VALIDATION_ERROR',
-                            'message' => '필수 필드가 비었습니다.']
+                'error'   => [
+                    'code'    => 'VALIDATION_ERROR',
+                    'message' => '필수 필드가 비었습니다.'
+                    ]
             ], 401);
             return;
         }
 
         // DB접속
         $db = get_db();
-        $repo = new UsersRepository($db);
-        $result = $repo->login($account, $role);
+        $service = new UsersService($db);
+        $result = $service->loginService($account, $role);
 
         if ($result === null) {
             json_response([
@@ -233,10 +243,12 @@ class UsersController {
 
         // 비밀번호 비겨
         if (!password_verify($password , $result['password'])) {
-            echo json_response([
+            json_response([
                 'success' => false,
-                'error' => ['code' => 'WRONG_PASSWORD',
-                            'message' => '비밀번호가 일치하지 않습니다.']
+                'error'   => [
+                    'code'    => 'WRONG_PASSWORD',
+                    'message' => '비밀번호가 일치하지 않습니다.'
+                    ]
             ], 401);
             return;
         }

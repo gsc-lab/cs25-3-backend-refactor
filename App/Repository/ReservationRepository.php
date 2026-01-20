@@ -20,11 +20,29 @@ class ReservationRepository {
     // ======================================
     public function show(
         int    $userId, 
-        string $where,      // 역할(client/designer)에 따라 WHERE 문이 달라짐
-        string $condition,  // 과거/미래 조건 (r.day > today 또는 < today)
-        string $today       // 오늘 날짜
+        string $role,     // 역할(client/designer)에 따라 WHERE 문이 달라짐
+        ?string $time,    // 과거/미래 조건 (r.day > today 또는 < today)
+        string $today     // 오늘 날짜
     ):object {
-    
+
+        $condition = "";
+        $where     = "";
+
+        if ((int)$time === -1) {
+                $condition = " r.day < ?";
+            } else {
+                $condition = " r.day >= ?";
+            }
+
+            // designer의 경우
+            if ($role === 'designer') {
+                $where = " WHERE r.designer_id = ?";
+            } 
+            // client의 경우 
+            elseif ($role === 'client') {
+                $where = " WHERE r.client_id = ?";
+            }
+
         $stmt = $this->db->prepare("SELECT 
                                         r.reservation_id,
                                         uc.user_name AS client_name,
@@ -39,7 +57,7 @@ class ReservationRepository {
                                         r.cancel_reason,
                                         r.created_at,
                                         r.updated_at,
-                                        s.price
+                                        rs.unit_price AS price
                                         FROM Reservation AS r
                                         JOIN Users AS uc 
                                             ON uc.user_id = r.client_id   -- client name
@@ -58,6 +76,43 @@ class ReservationRepository {
         return $stmt->get_result();
     }
 
+
+    // =======================================================
+    // 'GET' -> 특정 디자이너 예약 정보 보기 (client, designer)
+    // =======================================================
+    public function findUpcomingReservationsByDesigner(
+        string $designerId,
+        string $today
+    ): object {
+
+         // where 조건
+        $where = " WHERE r.designer_id = ?";
+        
+        // day
+        $day = " r.day >= ? ";
+
+        $stmt = $this->db->prepare("SELECT 
+                                    r.reservation_id,
+                                    ud.user_name as designer_name,
+                                    r.day,
+                                    r.start_at,
+                                    r.end_at,
+                                    r.status
+                                    FROM Reservation AS r
+                                    JOIN Users AS ud -- designer
+                                        ON r.designer_id = ud.user_id
+                                    JOIN ReservationService AS rs
+                                        ON r.reservation_id = rs.reservation_id
+                                    JOIN Service AS s
+                                        ON rs.service_id = s.service_id
+                                    $where AND $day
+                                    ORDER BY r.day, start_at");
+
+        $stmt->bind_param('is', $designerId, $today);
+        $stmt->execute();
+        return $stmt->get_result();
+
+    }
 
     // ========================================
     //  선택한 서비스들의 duration_min 합계를 계산
@@ -94,7 +149,7 @@ class ReservationRepository {
     public function checkTimeoff(
         int    $designerId,
         string $reservationDay
-    ):int{
+    ):bool{
         // designer 휴무과 여약시간 중복 여부를 확인
         $stmt = $this->db->prepare("SELECT 1 
                                 FROM TimeOff
@@ -107,7 +162,7 @@ class ReservationRepository {
         $stmt->execute();
         
         // 1건이라도 있으면 중복 → 예약 불가
-        return $stmt->get_result()->num_rows == 1;
+        return $stmt->get_result()->num_rows <= 0;
     }
 
     // ============================================
@@ -122,7 +177,7 @@ class ReservationRepository {
         string $reservationDay,
         string $endAt,
         string $startAt  
-    ):int {
+    ):bool {
 
         $stmt = $this->db->prepare("SELECT 1
                                         FROM Reservation
@@ -137,7 +192,7 @@ class ReservationRepository {
         $stmt->execute();
 
         // 1건이라도 있으면 중복 → 예약 불가
-        return $stmt->get_result()->num_rows === 1;
+        return $stmt->get_result()->num_rows <= 0;
      }
 
 
