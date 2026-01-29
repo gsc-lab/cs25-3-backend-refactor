@@ -7,8 +7,16 @@
 
 ---
 
+## 開発期間・体制
+
+- 開発期間：2025年8月28〜12月4日
+- チーム構成：3名（Frontend / Learning / Backend）
+  
+---
+
 ## デモ・リポジトリ
-- GitHub：(https://github.com/gsc-lab/cs25-3-backend-refactor.git) 
+- 開発初期リポジトリ（リファクタリング前）  
+  https://github.com/gsc-lab/cs25-3-backend
 - 画面例  
   - 予約作成画面  
   - 予約一覧画面  
